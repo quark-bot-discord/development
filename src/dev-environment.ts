@@ -1,4 +1,11 @@
 import { Logger } from "./logger.ts";
+import inquirer from "inquirer";
+import { ClusterManager } from "./cluster-manager.ts";
+import { ServiceManager } from "./service-manager.ts";
+import { SERVICE_GROUPS, DEVELOPMENT_PROFILES, QUARK_REPOS } from "@quark/q4";
+import type { VSCodeWorkspace, ClusterConfig } from "./types.ts";
+import { execSync } from "node:child_process";
+import { exists } from "@std/fs";
 
 export class DevEnvironment {
   private readonly clusterManager: ClusterManager;
@@ -61,15 +68,14 @@ export class DevEnvironment {
     }
 
     Logger.step(2, 3, "Applying service configurations...");
-    for (const service of services) {
-      try {
-        await this.clusterManager.applyServiceConfig(service);
-        Logger.success(`Applied configuration for ${service}`);
-      } catch (error) {
-        Logger.error(
-          `Failed to apply configuration for ${service}: ${error.message}`,
-        );
-      }
+    try {
+      await this.clusterManager.applyConfigurations(services);
+      Logger.success("Service configurations applied successfully");
+    } catch (error) {
+      Logger.error(
+        `Failed to apply service configurations: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
     }
 
     Logger.step(3, 3, "Cluster setup complete");
@@ -125,16 +131,94 @@ export class DevEnvironment {
     }
 
     Logger.step(2, 3, "Setting up repositories...");
-    for (const service of [...services, ...allDeps]) {
+    const servicesWithDeps = [...new Set([...services, ...allDeps])];
+    const servicesWithRepos = servicesWithDeps.filter(service => 
+      service in QUARK_REPOS && 
+      !service.startsWith('configmap:') && 
+      !service.startsWith('secret:') && 
+      !service.startsWith('pvc:')
+    );
+
+    for (const service of servicesWithRepos) {
       try {
         await this.cloneServiceRepo(service);
         Logger.success(`Cloned ${service}`);
       } catch (error) {
-        Logger.error(`Failed to clone ${service}: ${error.message}`);
+        Logger.error(`Failed to clone ${service}: ${error instanceof Error ? error.message : String(error)}`);
+        throw error; // Re-throw to stop the setup process
       }
     }
 
     Logger.step(3, 3, "Repository setup complete");
+  }
+
+  private async createVSCodeWorkspace(services: string[]): Promise<void> {
+    // Filter out infrastructure services
+    const appServices = services.filter(service => {
+      const isInfraService = SERVICE_GROUPS.core.services.includes(service);
+      const isKubeResource = service.startsWith('configmap:') || 
+                           service.startsWith('secret:') || 
+                           service.startsWith('pvc:');
+      return !isInfraService && !isKubeResource;
+    });
+
+    const workspace: VSCodeWorkspace = {
+      folders: [
+        {
+          name: "q4",
+          path: "/workspace"
+        },
+        ...appServices.map((service) => ({
+          name: service,
+          path: `/workspace/repos/${service}`,
+        }))
+      ],
+      settings: {
+        "files.exclude": {
+          node_modules: true,
+          ".git": true,
+          dist: true,
+          coverage: true,
+        },
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/dist": true,
+        },
+        "remote.containers.defaultExtensions": [
+          "denoland.vscode-deno",
+          "ms-kubernetes-tools.vscode-kubernetes-tools",
+          "github.vscode-pull-request-github"
+        ]
+      },
+      extensions: {
+        recommendations: [
+          "denoland.vscode-deno",
+          "ms-kubernetes-tools.vscode-kubernetes-tools",
+          "github.vscode-pull-request-github"
+        ]
+      },
+    };
+
+    await Deno.writeTextFile(
+      "/workspace/quark-dev.code-workspace",
+      JSON.stringify(workspace, null, 2),
+    );
+
+    Logger.success("Created VS Code workspace configuration");
+  }
+
+  async setup(): Promise<void> {
+    // Select services
+    const services = await this.selectServices();
+
+    // Set up cluster
+    await this.setupCluster(services);
+
+    // Set up repositories
+    await this.setupRepositories(services);
+
+    // Create workspace configuration
+    await this.createVSCodeWorkspace(services);
   }
 
   async cleanup(): Promise<void> {
@@ -159,5 +243,38 @@ export class DevEnvironment {
     }
 
     Logger.step(2, 2, "Cleanup complete");
+  }
+
+  private async cloneServiceRepo(service: string): Promise<void> {
+    const repoPath = `/workspace/repos/${service}`;
+
+    try {
+      if (!(service in QUARK_REPOS)) {
+        throw new Error(`No repository mapping found for service: ${service}`);
+      }
+
+      // Skip if repo already exists
+      if (await exists(repoPath)) {
+        Logger.info(`Repository for ${service} already exists at ${repoPath}`);
+        return;
+      }
+
+      const repoName = QUARK_REPOS[service as keyof typeof QUARK_REPOS];
+      const repoUrl = `https://github.com/quark-bot-discord/${repoName}.git`;
+      Logger.info(`Cloning ${service} from ${repoUrl}`)
+
+      execSync(`git clone ${repoUrl} ${repoPath}`, {
+        stdio: "inherit",
+      });
+
+      Logger.success(`Cloned ${service} to ${repoPath}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        Logger.error(`Failed to clone ${service}: ${error.message}`);
+      } else {
+        Logger.error(`Failed to clone ${service}: ${String(error)}`);
+      }
+      throw error;
+    }
   }
 }

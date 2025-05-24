@@ -4,7 +4,7 @@ import { parseArgs } from "@std/cli";
 import inquirer from "inquirer";
 import { DevEnvironment } from "./src/dev-environment.ts";
 import { ConfigManager } from "./src/config-manager.ts";
-import { SERVICE_GROUPS } from "./src/constants.ts";
+import { SERVICE_GROUPS, QUARK_REPOS } from "./q4/constants.ts";
 
 // Helper function to get all available services
 function getAllServices(): string[] {
@@ -39,6 +39,20 @@ function createGroupedChoices(filterServices?: (service: string) => boolean) {
   });
 }
 
+// Helper function to get service namespace
+function getServiceNamespace(service: string): string {
+  for (const [type, group] of Object.entries(SERVICE_GROUPS)) {
+    if (group.services.includes(service)) {
+      switch (type) {
+        case "core": return "core-services";
+        case "apps": return "app-services";
+        default: return "other-services";
+      }
+    }
+  }
+  return "other-services";
+}
+
 const devEnv = new DevEnvironment();
 const config = ConfigManager.getInstance();
 
@@ -62,6 +76,8 @@ Commands:
   add    [service]      Add local services (interactive if no service specified)
   remove [service]      Remove local services (interactive if no service specified)
   start                 Start all configured local services
+  cleanup              Clean up development environment
+  list-services        List all available services (used for shell completion)
 `);
   Deno.exit(0);
 }
@@ -80,23 +96,36 @@ Commands:
 
         if (serviceArg) {
           // Direct service addition mode
-          if (!getAllServices().includes(serviceArg)) {
+          const allServices = getAllServices();
+          if (!allServices.includes(serviceArg)) {
             console.error(`Invalid service: ${serviceArg}`);
             console.error("Available services:");
-            console.error(getAllServices().join(", "));
+            console.error(allServices.join(", "));
             Deno.exit(1);
           }
 
+          if (SERVICE_GROUPS.core.services.includes(serviceArg)) {
+            console.error(`Cannot add infrastructure service ${serviceArg} as a local service`);
+            Deno.exit(1);
+          }
+
+          if (getLocalServices().includes(serviceArg)) {
+            console.error(`Service ${serviceArg} is already configured as local`);
+            Deno.exit(1);
+          }
+
+          const repoPath = `/workspace/repos/${serviceArg}`;
           await config.addLocalService(serviceArg, {
-            repoPath: Deno.cwd(),
-            script: "npm start",
+            repoPath,
+            script: "start",
             env: {},
+            namespace: getServiceNamespace(serviceArg)
           });
           console.log(`Added local service: ${serviceArg}`);
         } else {
           // Interactive selection mode
           const choices = createGroupedChoices(
-            (service) => !getLocalServices().includes(service),
+            (service) => !getLocalServices().includes(service) && !SERVICE_GROUPS.core.services.includes(service),
           );
 
           if (choices.length === 0) {
@@ -123,10 +152,17 @@ Commands:
 
           if (selectedServices && selectedServices.length > 0) {
             for (const service of selectedServices) {
+              if (SERVICE_GROUPS.core.services.includes(service)) {
+                console.warn(`Skipping infrastructure service ${service}`);
+                continue;
+              }
+              
+              const repoPath = `/workspace/repos/${service}`;
               await config.addLocalService(service, {
-                repoPath: Deno.cwd(),
-                script: "npm start",
+                repoPath,
+                script: "start",
                 env: {},
+                namespace: getServiceNamespace(service)
               });
               console.log(`Added local service: ${service}`);
             }
@@ -221,6 +257,10 @@ Commands:
             );
           }
         }
+        break;
+      }
+      case "list-services": {
+        console.log(getAllServices().join("\n"));
         break;
       }
       case "cleanup": {

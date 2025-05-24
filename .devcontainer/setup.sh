@@ -10,16 +10,30 @@ fi
 mkdir -p /home/vscode/.local/share/bash-completion/completions
 mkdir -p /workspace/kube
 mkdir -p /workspace/repos
+mkdir -p /home/vscode/.local/state/vs-kubernetes/tools/kubectl
+mkdir -p /home/vscode/.local/state/vs-kubernetes/tools/helm/linux-amd64
 
 # Add vscode user to docker group
 usermod -aG docker vscode
+
+# Ensure kubectl is available and create symlink
+if [ -f "/usr/local/bin/kubectl" ]; then
+    ln -sf /usr/local/bin/kubectl /home/vscode/.local/state/vs-kubernetes/tools/kubectl/kubectl
+fi
+
+# Ensure helm is available and create symlink
+if [ -f "/usr/local/bin/helm" ]; then
+    ln -sf /usr/local/bin/helm /home/vscode/.local/state/vs-kubernetes/tools/helm/linux-amd64/helm
+fi
+
 
 # Set initial permissions
 chown -R vscode:vscode /home/vscode/.local
 chown -R vscode:vscode /home/vscode/.cache/deno
 chown -R vscode:vscode /home/vscode/.deno
 chown -R vscode:vscode /workspace/kube
-chown -R vscode:vscode /workspace/repos
+chown -R vscode:vscode /home/vscode/.local/state/vs-kubernetes
+
 # Setup environment for vscode user
 sudo -u vscode bash << 'EOF'
 # Activate docker group in current session
@@ -37,6 +51,18 @@ echo 'source ~/.local/share/bash-completion/completions/quark' >> ~/.profile
 
 # Install Quark CLI
 $HOME/.deno/bin/deno install --global -A -f --config /workspace/deno.json --name quark /workspace/main.ts
+
+# Setup kubectl completion
+kubectl completion bash > /home/vscode/.local/share/bash-completion/completions/kubectl
+
+# Setup helm completion
+helm completion bash > /home/vscode/.local/share/bash-completion/completions/helm
+
+# Verify installations
+echo "Verifying installations..."
+kubectl version --client
+helm version
+k3d version
 INNEREOF
 EOF
 

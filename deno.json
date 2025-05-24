@@ -13,7 +13,8 @@
     "@types/inquirer": "npm:@types/inquirer@^9.0.8",
     "inquirer": "npm:inquirer@^12.6.2",
     "chalk": "npm:chalk@5.4.1",
-    "yaml": "npm:yaml@^2.8.0"
+    "yaml": "npm:yaml@^2.8.0",
+    "@quark/q4": "./q4/mod.ts"
   },
   "nodeModulesDir": "none",
   "exports": "./main.ts"

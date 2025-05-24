@@ -1,13 +1,15 @@
 import { execSync } from "node:child_process";
-import fs from "node:fs/promises";
-import path from "node:path";
-import chalk from "npm:chalk";
-import process from "node:process";
-import type { K3dCluster } from "./types.ts";
+import { join } from "@std/path";
+import { exists } from "@std/fs";
 import { Logger } from "./logger.ts";
+import type { K3dCluster } from "./types.ts";
+import { SERVICE_GROUPS } from "../q4/constants.ts";
 
 export class ClusterManager {
   private static instance: ClusterManager;
+  private currentCluster: K3dCluster | null = null;
+  private static readonly K8S_MANIFESTS_DIR = "quark-k8s";
+  private static readonly SERVICE_DIRS = ["core-services", "app-services", "other-services"];
 
   private constructor() {}
 
@@ -18,167 +20,50 @@ export class ClusterManager {
     return ClusterManager.instance;
   }
 
-  createLocalCluster(name: string): boolean {
+  async createLocalCluster(name: string): Promise<boolean> {
     try {
-      // Check if cluster already exists
-      if (this.checkClusterExists(name)) {
-        console.log(
-          chalk.yellow("Cluster already exists, cleaning up first..."),
-        );
-        this.deleteLocalCluster(name);
-        // Give docker time to clean up
-      }
-
-      console.log(chalk.blue("Creating new cluster..."));
-
-      // Create cluster with timeout and explicit network settings
-      execSync(
-        `k3d cluster create ${name} \
-        --api-port 6550 \
-        --network k3d-${name} \
-        --wait \
-        --timeout 120s \
-        --no-rollback`,
-        {
-          stdio: "inherit",
-          timeout: 180000, // 3 minute timeout
-        },
-      );
-
-      // Verify cluster is running
-      if (!this.checkClusterRunning(name)) {
-        throw new Error("Cluster created but not running");
-      }
-
-      return true;
-    } catch (err) {
-      console.error(
-        chalk.red("Failed to create local cluster:"),
-        err instanceof Error ? err.message : String(err),
-      );
-      return false;
-    }
-  }
-
-  deleteLocalCluster(name: string): boolean {
-    try {
-      console.log(chalk.yellow("Stopping cluster..."));
-      // First try to stop the cluster (in case it's stuck)
-      try {
-        execSync(`k3d cluster stop ${name}`, { stdio: "inherit" });
-      } catch (_err) {
-        // Ignore stop errors
-      }
-
-      console.log(chalk.yellow("Deleting cluster..."));
-      // Force delete with no confirmation
-      execSync(`k3d cluster delete ${name}`, { stdio: "inherit" });
-
-      // Clean up any lingering Docker resources
-      console.log(chalk.yellow("Cleaning up Docker resources..."));
-      try {
-        // Remove containers
-        execSync(
-          `docker ps -a --filter "name=k3d-${name}" --format "{{.Names}}" | xargs -r docker rm -f`,
-          { stdio: "pipe" },
-        );
-        // Remove networks
-        execSync(
-          `docker network ls --filter "name=k3d-${name}" --format "{{.Name}}" | xargs -r docker network rm`,
-          { stdio: "pipe" },
-        );
-        // Remove volumes
-        execSync(
-          `docker volume ls --filter "name=k3d-${name}" --format "{{.Name}}" | xargs -r docker volume rm`,
-          { stdio: "pipe" },
-        );
-      } catch (_err) {
-        // Ignore cleanup errors
-      }
-
-      // Verify cluster is gone
-      const clusterExists = this.checkClusterExists(name);
+      const clusterExists = await this.checkClusterExists(name);
       if (clusterExists) {
-        throw new Error("Failed to completely remove cluster");
+        Logger.info(`Cluster ${name} already exists, checking if it's running...`);
+        const isRunning = await this.checkClusterRunning(name);
+        if (isRunning) {
+          Logger.info(`Cluster ${name} is already running`);
+          return true;
+        }
+        Logger.info(`Starting existing cluster ${name}...`);
+        execSync(`k3d cluster start ${name}`, { stdio: "inherit" });
+      } else {
+        Logger.info(`Creating new cluster ${name}...`);
+        execSync(
+          `k3d cluster create ${name} --wait --timeout 120s`,
+          { stdio: "inherit" }
+        );
       }
 
-      return true;
+      // Wait for the cluster to be ready
+      return await this.waitForCluster(name);
     } catch (err) {
-      console.error(
-        chalk.red("Failed to delete local cluster:"),
-        err instanceof Error ? err.message : String(err),
+      Logger.error(
+        `Failed to create local cluster: ${err instanceof Error ? err.message : String(err)}`
       );
       return false;
     }
   }
 
-  async generateKubeconfig(context: string): Promise<string | null> {
+  async deleteLocalCluster(name: string): Promise<boolean> {
     try {
-      // Create kube directory if it doesn't exist
-      const kubeDir = path.join(process.cwd(), "kube");
-      await fs.mkdir(kubeDir, { recursive: true });
-
-      const kubeconfigPath = path.join(kubeDir, `kubeconfig-${context}.yaml`);
-
-      if (context.startsWith("k3d-")) {
-        // For k3d clusters, use k3d's kubeconfig export
-        execSync(
-          `k3d kubeconfig get ${
-            context.replace("k3d-", "")
-          } > ${kubeconfigPath}`,
-          {
-            stdio: "inherit",
-          },
-        );
-      } else {
-        // For other clusters, export the specific context
-        const config = execSync(
-          `kubectl config view --raw --flatten --minify --context=${context} -o yaml`,
-          { encoding: "utf8" },
-        );
-        await fs.writeFile(kubeconfigPath, config);
+      const clusterExists = await this.checkClusterExists(name);
+      if (!clusterExists) {
+        Logger.info(`Cluster ${name} does not exist`);
+        return true;
       }
 
-      // Ensure the kubeconfig is readable
-      await fs.chmod(kubeconfigPath, 0o600);
-
-      return kubeconfigPath;
-    } catch (err) {
-      console.error(
-        chalk.red("Failed to generate kubeconfig:"),
-        err instanceof Error ? err.message : String(err),
-      );
-      return null;
-    }
-  }
-
-  getAvailableContexts(): string[] {
-    try {
-      return execSync("kubectl config get-contexts -o name", {
-        encoding: "utf8",
-      })
-        .split("\n")
-        .filter(Boolean);
-    } catch (err) {
-      console.error(
-        chalk.red("Failed to get kubectl contexts:"),
-        err instanceof Error ? err.message : String(err),
-      );
-      return [];
-    }
-  }
-
-  applyManifest(filePath: string, namespace?: string): boolean {
-    try {
-      const cmd = namespace
-        ? `kubectl apply -f ${filePath} -n ${namespace}`
-        : `kubectl apply -f ${filePath}`;
-      execSync(cmd, { stdio: "inherit" });
+      Logger.info(`Deleting cluster ${name}...`);
+      execSync(`k3d cluster delete ${name}`, { stdio: "inherit" });
       return true;
     } catch (err) {
-      console.error(
-        chalk.red(`Failed to apply manifest ${filePath}:`),
-        err instanceof Error ? err.message : String(err),
+      Logger.error(
+        `Failed to delete local cluster: ${err instanceof Error ? err.message : String(err)}`
       );
       return false;
     }
@@ -188,15 +73,28 @@ export class ClusterManager {
     try {
       execSync(
         `kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -`,
-        {
-          stdio: "inherit",
-        },
+        { stdio: "inherit" }
       );
       return true;
     } catch (err) {
-      console.error(
-        chalk.red(`Failed to create namespace ${namespace}:`),
-        err instanceof Error ? err.message : String(err),
+      Logger.error(
+        `Failed to create namespace ${namespace}: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return false;
+    }
+  }
+
+  applyManifest(filePath: string, namespace?: string): boolean {
+    try {
+      let command = `kubectl apply -f "${filePath}"`;
+      if (namespace) {
+        command += ` -n ${namespace}`;
+      }
+      execSync(command, { stdio: "inherit" });
+      return true;
+    } catch (err) {
+      Logger.error(
+        `Failed to apply manifest ${filePath}: ${err instanceof Error ? err.message : String(err)}`
       );
       return false;
     }
@@ -204,64 +102,96 @@ export class ClusterManager {
 
   async applyConfigurations(services: string[]): Promise<void> {
     // First apply namespace configs
-    console.log(chalk.blue("Creating namespaces..."));
-    for (const ns of ["core-services", "app-services", "other-services"]) {
-      this.createNamespace(ns);
+    Logger.info("Creating namespaces...");
+    for (const ns of ClusterManager.SERVICE_DIRS) {
+      if (!this.createNamespace(ns)) {
+        throw new Error(`Failed to create namespace ${ns}`);
+      }
     }
 
-    // Then core services
-    console.log(chalk.blue("\nApplying core service configurations..."));
-    const coreScriptPath = path.join(
-      process.cwd(),
-      "quark-k8s",
-      "scripts",
-      "core.sh",
-    );
-    execSync(`bash ${coreScriptPath}`, { stdio: "inherit" });
+    // Apply core services first
+    Logger.info("Applying core service configurations...");
+    const coreServices = SERVICE_GROUPS.core.services;
 
-    // Then apply selected service manifests in the right order
-    console.log(chalk.blue("\nApplying service configurations..."));
+    // First apply namespace config
+    const namespaceManifest = join(Deno.cwd(), ClusterManager.K8S_MANIFESTS_DIR, "core-services", "namespace.yaml");
+    try {
+      if (await exists(namespaceManifest)) {
+        if (!this.applyManifest(namespaceManifest, "core-services")) {
+          throw new Error("Failed to apply core services namespace configuration");
+        }
+        Logger.success("Applied core services namespace configuration");
+      }
+    } catch (err) {
+      Logger.error(`Failed to apply core namespace: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Then apply core services
+    for (const service of coreServices) {
+      const manifestPath = join(Deno.cwd(), ClusterManager.K8S_MANIFESTS_DIR, "core-services", `${service}.yaml`);
+      try {
+        if (await exists(manifestPath)) {
+          if (!this.applyManifest(manifestPath, "core-services")) {
+            throw new Error(`Failed to apply core service: ${service}`);
+          }
+          Logger.success(`Applied core service: ${service}`);
+        } else {
+          Logger.info(`Core service manifest not found: ${manifestPath}`);
+        }
+      } catch (err) {
+        Logger.error(`Failed to apply core service ${service}: ${err instanceof Error ? err.message : String(err)}`);
+        // Continue with other core services instead of failing completely
+        continue;
+      }
+    }
+
+    // Try to apply any secrets if they exist
+    const secretsPath = join(Deno.cwd(), ClusterManager.K8S_MANIFESTS_DIR, "core-services", "secrets");
+    try {
+      if (await exists(secretsPath)) {
+        const command = `find "${secretsPath}" -name "*.yaml" -exec kubectl apply -f {} -n core-services \\;`;
+        execSync(command, { stdio: "inherit" });
+        Logger.success("Applied core service secrets");
+      }
+    } catch (_err) {
+      Logger.info("No core service secrets found or failed to apply them");
+    }
+
+    // Then apply selected service manifests
+    Logger.info("Applying service configurations...");
     for (const service of services) {
-      // Find the manifest file
-      const manifestPaths = [
-        path.join(
-          process.cwd(),
-          "quark-k8s",
-          "core-services",
-          `${service}.yaml`,
-        ),
-        path.join(
-          process.cwd(),
-          "quark-k8s",
-          "app-services",
-          `${service}.yaml`,
-        ),
-        path.join(
-          process.cwd(),
-          "quark-k8s",
-          "other-services",
-          `${service}.yaml`,
-        ),
-      ];
-
-      for (const manifestPath of manifestPaths) {
+      let applied = false;
+      
+      // Try each service directory in order
+      for (const dir of ClusterManager.SERVICE_DIRS) {
+        const manifestPath = join(Deno.cwd(), ClusterManager.K8S_MANIFESTS_DIR, dir, `${service}.yaml`);
+        
         try {
-          await fs.access(manifestPath);
-          this.applyManifest(manifestPath);
-          break;
-        } catch {
+          if (await exists(manifestPath)) {
+            if (this.applyManifest(manifestPath, dir)) {
+              Logger.success(`Applied ${service} configuration from ${dir}`);
+              applied = true;
+              break;
+            }
+          }
+        } catch (err) {
+          Logger.error(`Error checking/applying manifest for ${service} in ${dir}: ${err instanceof Error ? err.message : String(err)}`);
           continue;
         }
+      }
+
+      if (!applied) {
+        Logger.error(`Failed to find or apply configuration for ${service}`);
+        throw new Error(`Failed to apply configuration for ${service}`);
       }
     }
   }
 
   private checkClusterExists(name: string): boolean {
     try {
-      const output = execSync(`k3d cluster list -o json`, { encoding: "utf8" });
-      const clusters = JSON.parse(output) as K3dCluster[];
-      return clusters.some((cluster) => cluster.name === name);
-    } catch (_err) {
+      execSync(`k3d cluster list ${name}`, { stdio: "pipe" });
+      return true;
+    } catch {
       return false;
     }
   }
@@ -271,29 +201,88 @@ export class ClusterManager {
       const output = execSync(`k3d cluster list -o json`, { encoding: "utf8" });
       const clusters = JSON.parse(output) as K3dCluster[];
       const cluster = clusters.find((c) => c.name === name);
-      return cluster !== undefined && cluster.serversRunning > 0;
-    } catch (_err) {
+      return cluster?.serversRunning === cluster?.servers?.length;
+    } catch {
       return false;
     }
   }
+
+  private async waitForCluster(name: string, timeout = 120): Promise<boolean> {
+    Logger.info(`Waiting for cluster ${name} to be ready...`);
+    const start = Date.now();
+    while (Date.now() - start < timeout * 1000) {
+      try {
+        execSync("kubectl get nodes", { stdio: "pipe" });
+        Logger.info("Cluster is ready!");
+        return true;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+    Logger.error(`Timeout waiting for cluster ${name} to be ready`);
+    return false;
+  }
+
+  useRemoteCluster(context: string): boolean {
+    try {
+      if (!this.validateKubeconfig(context)) {
+        throw new Error(`Invalid kubeconfig context: ${context}`);
+      }
+      Logger.info(`Using remote cluster context: ${context}`);
+      execSync(`kubectl config use-context ${context}`, { stdio: "inherit" });
+      return true;
+    } catch (err) {
+      Logger.error(
+        `Failed to use remote cluster: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return false;
+    }
+  }
+
+  private validateKubeconfig(context: string): boolean {
+    try {
+      execSync(`kubectl config get-context ${context}`, { stdio: "pipe" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async cleanupCluster(name: string): Promise<boolean> {
     try {
       Logger.info(`Cleaning up cluster ${name}...`);
 
-      // Stop and remove all containers in the cluster
-      await execSync(`k3d cluster stop ${name}`);
-      await execSync(`k3d cluster delete ${name}`);
+      // Check if the cluster exists
+      if (!(await this.checkClusterExists(name))) {
+        Logger.info(`Cluster ${name} does not exist, nothing to clean up`);
+        return true;
+      }
 
-      // Remove associated Docker resources
-      await execSync(`docker network rm k3d-${name} || true`);
+      // Stop the cluster if it's running
+      const isRunning = await this.checkClusterRunning(name);
+      if (isRunning) {
+        Logger.info(`Stopping cluster ${name}...`);
+        execSync(`k3d cluster stop ${name}`, { stdio: "inherit" });
+      }
 
-      Logger.success(`Cleaned up cluster ${name}`);
+      // Delete the cluster
+      Logger.info(`Deleting cluster ${name}...`);
+      execSync(`k3d cluster delete ${name}`, { stdio: "inherit" });
+
+      // Clean up kubeconfig
+      Logger.info("Cleaning up kubeconfig...");
+      try {
+        execSync(`kubectl config unset current-context`, { stdio: "pipe" });
+        execSync(`kubectl config delete-context k3d-${name}`, { stdio: "pipe" });
+        execSync(`kubectl config delete-cluster k3d-${name}`, { stdio: "pipe" });
+      } catch {
+        // Ignore errors during kubeconfig cleanup
+      }
+
       return true;
     } catch (err) {
       Logger.error(
-        `Failed to cleanup cluster: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `Failed to clean up cluster ${name}: ${err instanceof Error ? err.message : String(err)}`
       );
       return false;
     }

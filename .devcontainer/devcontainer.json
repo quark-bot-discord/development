@@ -35,7 +35,9 @@
       "moby": true
     },
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
-      "version": "latest"
+      "version": "1.28",
+      "helm": "latest",
+      "minikube": "none"
     },
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": true,
@@ -51,19 +53,20 @@
         "ms-kubernetes-tools.vscode-kubernetes-tools",
         "ms-azuretools.vscode-docker",
         "github.copilot",
-        "github.copilot-chat"
+        "github.copilot-chat",
+        "github.vscode-pull-request-github"
       ],
       "settings": {
         "deno.enable": true,
         "deno.lint": true,
         "files.exclude": {
-          ".devcontainer": true,
-          "src": true,
-          "scripts": true,
-          "main.ts": true,
-          "deno.*": true,
-          "quark-k8s": true,
-          ".*": true
+          ".devcontainer": false,
+          "src": false,
+          "scripts": false,
+          "main.ts": false,
+          "deno.*": false,
+          "quark-k8s": false,
+          ".*": false
         }
       }
     }
