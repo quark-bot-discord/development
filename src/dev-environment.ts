@@ -7,12 +7,55 @@ export class DevEnvironment {
     this.serviceManager = ServiceManager.getInstance();
   }
 
+  private async selectClusterType(): Promise<ClusterConfig> {
+    const { clusterType } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "clusterType",
+        message: "Select cluster type:",
+        choices: [
+          { name: "Local (k3d)", value: "local" },
+          { name: "Remote", value: "remote" },
+        ],
+      },
+    ]);
+
+    if (clusterType === "local") {
+      return {
+        type: "local",
+        name: "quark-dev"
+      };
+    }
+
+    const { context } = await inquirer.prompt([
+      {
+        type: "input",
+        name: "context",
+        message: "Enter remote cluster context:",
+        validate: (input) => input.length > 0,
+      },
+    ]);
+
+    return {
+      type: "remote",
+      name: "remote-cluster",
+      context
+    };
+  }
+
   async setupCluster(services: string[]): Promise<void> {
     Logger.step(1, 3, "Setting up kubernetes cluster...");
     
-    const clusterName = "quark-dev";
-    if (!await this.clusterManager.createLocalCluster(clusterName)) {
-      throw new Error("Failed to create local cluster");
+    const clusterConfig = await this.selectClusterType();
+    
+    if (clusterConfig.type === "local") {
+      if (!await this.clusterManager.createLocalCluster(clusterConfig.name)) {
+        throw new Error("Failed to create local cluster");
+      }
+    } else {
+      if (!await this.clusterManager.useRemoteCluster(clusterConfig.context!)) {
+        throw new Error("Failed to configure remote cluster");
+      }
     }
 
     Logger.step(2, 3, "Applying service configurations...");

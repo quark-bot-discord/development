@@ -41,3 +41,10 @@ export interface KubernetesConfig {
     }>;
   };
 }
+
+export interface ClusterConfig {
+  type: 'local' | 'remote';
+  name: string;
+  context?: string;
+  kubeconfig?: string;
+}
