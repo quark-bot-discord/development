@@ -1,4 +1,34 @@
 export class DevEnvironment {
+  private readonly clusterManager: ClusterManager;
+  private readonly serviceManager: ServiceManager;
+
+   constructor() {
+    this.clusterManager = ClusterManager.getInstance();
+    this.serviceManager = ServiceManager.getInstance();
+  }
+
+  async setupCluster(services: string[]): Promise<void> {
+    Logger.step(1, 3, "Setting up kubernetes cluster...");
+    
+    const clusterName = "quark-dev";
+    if (!await this.clusterManager.createLocalCluster(clusterName)) {
+      throw new Error("Failed to create local cluster");
+    }
+
+    Logger.step(2, 3, "Applying service configurations...");
+    for (const service of services) {
+      try {
+        await this.clusterManager.applyServiceConfig(service);
+        Logger.success(`Applied configuration for ${service}`);
+      } catch (error) {
+        Logger.error(`Failed to apply configuration for ${service}: ${error.message}`);
+      }
+    }
+
+    Logger.step(3, 3, "Cluster setup complete");
+  }
+}
+
   async selectServices(): Promise<string[]> {
     const { profile } = await inquirer.prompt([
       {
