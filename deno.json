@@ -1,0 +1,20 @@
+{
+  "name": "@quark/dev-env",
+  "version": "1.0.0",
+  "description": "Development environment manager for Quark services",
+  "tasks": {
+    "dev": "deno run --watch --allow-read --allow-write --allow-env --allow-run --allow-net main.ts",
+    "start": "deno run --allow-read --allow-write --allow-env --allow-run --allow-net main.ts"
+  },
+  "imports": {
+    "@std/cli": "jsr:@std/cli@^1.0.17",
+    "@std/fs": "jsr:@std/fs@^1.0.17",
+    "@std/path": "jsr:@std/path@^1.0.9",
+    "@types/inquirer": "npm:@types/inquirer@^9.0.8",
+    "inquirer": "npm:inquirer@^12.6.2",
+    "chalk": "npm:chalk@5.4.1",
+    "yaml": "npm:yaml@^2.8.0"
+  },
+  "nodeModulesDir": "none",
+  "exports": "./main.ts"
+}
