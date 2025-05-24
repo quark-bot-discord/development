@@ -39,18 +39,26 @@ export class DevEnvironment {
     return selectedGroups.flat();
   }
 }
-// filepath: /home/crunchy/dev/quark/development/src/dev-environment.ts
-async setupRepositories(services: string[]): Promise<void> {
-  const allDeps = new Set<string>();
-  
-  // Get all dependencies
-  for (const service of services) {
-    const deps = await this.serviceManager.getServiceDependencies(service);
-    deps.forEach(dep => allDeps.add(dep));
-  }
 
-  console.log(chalk.blue("Setting up repositories..."));
-  for (const service of [...services, ...allDeps]) {
-    await this.cloneServiceRepo(service);
+  async setupRepositories(services: string[]): Promise<void> {
+    const allDeps = new Set<string>();
+    
+    Logger.step(1, 3, "Resolving service dependencies...");
+    for (const service of services) {
+      const deps = await this.serviceManager.getServiceDependencies(service);
+      deps.forEach(dep => allDeps.add(dep));
+    }
+
+    Logger.step(2, 3, "Setting up repositories...");
+    for (const service of [...services, ...allDeps]) {
+      try {
+        await this.cloneServiceRepo(service);
+        Logger.success(`Cloned ${service}`);
+      } catch (error) {
+        Logger.error(`Failed to clone ${service}: ${error.message}`);
+      }
+    }
+
+    Logger.step(3, 3, "Repository setup complete");
   }
 }
