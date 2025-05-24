@@ -44,6 +44,10 @@
       "configureZshAsDefaultShell": false,
       "installOhMyZsh": false,
       "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22",
+      "nodeGypDependencies": true
     }
   },
   "customizations": {
@@ -72,5 +76,6 @@
     }
   },
   "updateRemoteUserUID": true,
-  "postStartCommand": "sudo /workspace/.devcontainer/setup.sh && exec bash"
+  "postStartCommand": "sudo /workspace/.devcontainer/setup.sh && exec bash",
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@latest --activate"
 }
