@@ -2,18 +2,21 @@ import { Logger } from "./logger.ts";
 import inquirer from "inquirer";
 import { ClusterManager } from "./cluster-manager.ts";
 import { ServiceManager } from "./service-manager.ts";
+import { ConfigManager } from "./config-manager.ts";
 import { SERVICE_GROUPS, DEVELOPMENT_PROFILES, QUARK_REPOS } from "@quark/q4";
 import type { VSCodeWorkspace, ClusterConfig } from "./types.ts";
 import { execSync } from "node:child_process";
 import { exists } from "@std/fs";
 
 export class DevEnvironment {
-  private readonly clusterManager: ClusterManager;
-  private readonly serviceManager: ServiceManager;
+  private serviceManager: ServiceManager;
+  private clusterManager: ClusterManager;
+  private configManager: ConfigManager;
 
   constructor() {
-    this.clusterManager = ClusterManager.getInstance();
     this.serviceManager = ServiceManager.getInstance();
+    this.clusterManager = ClusterManager.getInstance();
+    this.configManager = ConfigManager.getInstance();
   }
 
   private async selectClusterType(): Promise<ClusterConfig> {
@@ -268,6 +271,7 @@ export class DevEnvironment {
       });
 
       Logger.success(`Cloned ${service} to ${repoPath}`);
+      this.configManager.addClonedRepo(service, repoPath);
     } catch (error) {
       if (error instanceof Error) {
         Logger.error(`Failed to clone ${service}: ${error.message}`);

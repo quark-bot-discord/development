@@ -11,10 +11,12 @@ export class ServiceManager {
   private static instance: ServiceManager;
   private manifestCache: Map<string, KubernetesConfig[]> = new Map();
   private static readonly K8S_ROOT = "quark-k8s";
-  private static readonly SERVICE_DIRS = ["app-services", "core-services", "other-services"];
+  private static readonly SERVICE_DIRS = ["core-services", "app-services", "other-services"];
 
   // Map to track service dependencies
   private dependencyGraph: Map<string, Set<string>> = new Map();
+  // Map to track service paths to names
+  private servicePathToName: Map<string, string> = new Map();
 
   private constructor() {}
 
@@ -55,6 +57,13 @@ export class ServiceManager {
 
       // Cache all valid configs
       this.manifestCache.set(servicePath, configs);
+      
+      // Store the service name mapping if we can determine it
+      const serviceName = servicePath.split('/').pop()?.replace('.yaml', '');
+      if (serviceName) {
+        this.servicePathToName.set(servicePath, serviceName);
+      }
+      
       return configs;
     } catch (err) {
       Logger.error(`Failed to load K8s config from ${servicePath}: ${err instanceof Error ? err.message : String(err)}`);
@@ -191,10 +200,15 @@ export class ServiceManager {
   clearManifestCache(servicePath?: string): void {
     if (servicePath) {
       this.manifestCache.delete(servicePath);
-      this.dependencyGraph.delete(servicePath);
+      const serviceName = this.servicePathToName.get(servicePath);
+      if (serviceName) {
+        this.dependencyGraph.delete(serviceName);
+        this.servicePathToName.delete(servicePath);
+      }
     } else {
       this.manifestCache.clear();
       this.dependencyGraph.clear();
+      this.servicePathToName.clear();
     }
   }
 

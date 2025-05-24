@@ -5,6 +5,7 @@ import inquirer from "inquirer";
 import { DevEnvironment } from "./src/dev-environment.ts";
 import { ConfigManager } from "./src/config-manager.ts";
 import { SERVICE_GROUPS, QUARK_REPOS } from "./q4/constants.ts";
+import { Logger } from "./src/logger.ts";
 
 // Helper function to get all available services
 function getAllServices(): string[] {
@@ -68,7 +69,7 @@ const command = args._[0] as string;
 const serviceArg = args._[1] as string;
 
 if (args.help || !command) {
-  console.log(`
+  Logger.info(`
 Usage: quark <command>
 
 Commands:
@@ -98,19 +99,19 @@ Commands:
           // Direct service addition mode
           const allServices = getAllServices();
           if (!allServices.includes(serviceArg)) {
-            console.error(`Invalid service: ${serviceArg}`);
-            console.error("Available services:");
-            console.error(allServices.join(", "));
+            Logger.error(`Invalid service: ${serviceArg}`);
+            Logger.error("Available services:");
+            Logger.info(allServices.join(", "));
             Deno.exit(1);
           }
 
           if (SERVICE_GROUPS.core.services.includes(serviceArg)) {
-            console.error(`Cannot add infrastructure service ${serviceArg} as a local service`);
+            Logger.error(`Cannot add infrastructure service ${serviceArg} as a local service`);
             Deno.exit(1);
           }
 
           if (getLocalServices().includes(serviceArg)) {
-            console.error(`Service ${serviceArg} is already configured as local`);
+            Logger.error(`Service ${serviceArg} is already configured as local`);
             Deno.exit(1);
           }
 
@@ -121,7 +122,7 @@ Commands:
             env: {},
             namespace: getServiceNamespace(serviceArg)
           });
-          console.log(`Added local service: ${serviceArg}`);
+          Logger.info(`Added local service: ${serviceArg}`);
         } else {
           // Interactive selection mode
           const choices = createGroupedChoices(
@@ -129,7 +130,7 @@ Commands:
           );
 
           if (choices.length === 0) {
-            console.error("No services available to add");
+            Logger.error("No services available to add");
             Deno.exit(1);
           }
 
@@ -153,7 +154,7 @@ Commands:
           if (selectedServices && selectedServices.length > 0) {
             for (const service of selectedServices) {
               if (SERVICE_GROUPS.core.services.includes(service)) {
-                console.warn(`Skipping infrastructure service ${service}`);
+                Logger.warn(`Skipping infrastructure service ${service}`);
                 continue;
               }
               
@@ -164,7 +165,7 @@ Commands:
                 env: {},
                 namespace: getServiceNamespace(service)
               });
-              console.log(`Added local service: ${service}`);
+              Logger.info(`Added local service: ${service}`);
             }
           }
         }
@@ -178,20 +179,20 @@ Commands:
         if (serviceArg) {
           // Direct service removal mode
           if (!localServices.includes(serviceArg)) {
-            console.error(`Service ${serviceArg} is not configured as local`);
+            Logger.error(`Service ${serviceArg} is not configured as local`);
             if (localServices.length > 0) {
-              console.error("Currently configured local services:");
-              console.error(localServices.join(", "));
+              Logger.error("Currently configured local services:");
+              Logger.info(localServices.join(", "));
             }
             Deno.exit(1);
           }
 
           await config.removeLocalService(serviceArg);
-          console.log(`Removed local service: ${serviceArg}`);
+          Logger.info(`Removed local service: ${serviceArg}`);
         } else {
           // Interactive selection mode
           if (localServices.length === 0) {
-            console.error("No local services configured");
+            Logger.error("No local services configured");
             Deno.exit(1);
           }
 
@@ -219,7 +220,7 @@ Commands:
           if (selectedServices && selectedServices.length > 0) {
             for (const service of selectedServices) {
               await config.removeLocalService(service);
-              console.log(`Removed local service: ${service}`);
+              Logger.info(`Removed local service: ${service}`);
             }
           }
         }
@@ -231,15 +232,13 @@ Commands:
         const localServices = config.getLocalServices();
 
         if (Object.keys(localServices).length === 0) {
-          console.error(
-            "No local services configured. Use 'quark add' to add services.",
-          );
+          Logger.error("No local services configured. Use 'quark add' to add services.");
           Deno.exit(1);
         }
 
-        console.log("Starting local services...");
+        Logger.info("Starting local services...");
         for (const [service, config] of Object.entries(localServices)) {
-          console.log(`\nStarting ${service}...`);
+          Logger.info(`\nStarting ${service}...`);
           const process = new Deno.Command("npm", {
             args: ["run", config.script],
             cwd: config.repoPath,
@@ -249,18 +248,17 @@ Commands:
 
           try {
             const child = process.spawn();
-            console.log(`${service} started with PID ${child.pid}`);
+            Logger.success(`${service} started with PID ${child.pid}`);
           } catch (error) {
-            console.error(
-              `Failed to start ${service}:`,
-              error instanceof Error ? error.message : String(error),
+            Logger.error(
+              `Failed to start ${service}: ${error instanceof Error ? error.message : String(error)}`
             );
           }
         }
         break;
       }
       case "list-services": {
-        console.log(getAllServices().join("\n"));
+        Logger.info(getAllServices().join("\n"));
         break;
       }
       case "cleanup": {
@@ -269,13 +267,12 @@ Commands:
       }
 
       default:
-        console.error(`Unknown command: ${command}`);
+        Logger.error(`Unknown command: ${command}`);
         Deno.exit(1);
     }
   } catch (error) {
-    console.error(
-      "Error:",
-      error instanceof Error ? error.message : String(error),
+    Logger.error(
+      `Error: ${error instanceof Error ? error.message : String(error)}`
     );
     Deno.exit(1);
   }

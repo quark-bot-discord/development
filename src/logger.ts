@@ -13,6 +13,10 @@ export class Logger {
     console.log(chalk.yellow(`⚠ ${message}`));
   }
 
+  static warn(message: string): void {
+    this.warning(message);
+  }
+
   static error(message: string): void {
     console.error(chalk.red(`✖ ${message}`));
   }
