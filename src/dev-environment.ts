@@ -39,3 +39,18 @@ export class DevEnvironment {
     return selectedGroups.flat();
   }
 }
+// filepath: /home/crunchy/dev/quark/development/src/dev-environment.ts
+async setupRepositories(services: string[]): Promise<void> {
+  const allDeps = new Set<string>();
+  
+  // Get all dependencies
+  for (const service of services) {
+    const deps = await this.serviceManager.getServiceDependencies(service);
+    deps.forEach(dep => allDeps.add(dep));
+  }
+
+  console.log(chalk.blue("Setting up repositories..."));
+  for (const service of [...services, ...allDeps]) {
+    await this.cloneServiceRepo(service);
+  }
+}
