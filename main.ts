@@ -223,6 +223,10 @@ Commands:
         }
         break;
       }
+      case "cleanup": {
+        await devEnv.cleanup();
+        break;
+      }
 
       default:
         console.error(`Unknown command: ${command}`);

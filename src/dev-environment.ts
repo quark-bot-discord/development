@@ -1,8 +1,10 @@
+import { Logger } from "./logger.ts";
+
 export class DevEnvironment {
   private readonly clusterManager: ClusterManager;
   private readonly serviceManager: ServiceManager;
 
-   constructor() {
+  constructor() {
     this.clusterManager = ClusterManager.getInstance();
     this.serviceManager = ServiceManager.getInstance();
   }
@@ -23,7 +25,7 @@ export class DevEnvironment {
     if (clusterType === "local") {
       return {
         type: "local",
-        name: "quark-dev"
+        name: "quark-dev",
       };
     }
 
@@ -39,15 +41,15 @@ export class DevEnvironment {
     return {
       type: "remote",
       name: "remote-cluster",
-      context
+      context,
     };
   }
 
   async setupCluster(services: string[]): Promise<void> {
     Logger.step(1, 3, "Setting up kubernetes cluster...");
-    
+
     const clusterConfig = await this.selectClusterType();
-    
+
     if (clusterConfig.type === "local") {
       if (!await this.clusterManager.createLocalCluster(clusterConfig.name)) {
         throw new Error("Failed to create local cluster");
@@ -64,13 +66,14 @@ export class DevEnvironment {
         await this.clusterManager.applyServiceConfig(service);
         Logger.success(`Applied configuration for ${service}`);
       } catch (error) {
-        Logger.error(`Failed to apply configuration for ${service}: ${error.message}`);
+        Logger.error(
+          `Failed to apply configuration for ${service}: ${error.message}`,
+        );
       }
     }
 
     Logger.step(3, 3, "Cluster setup complete");
   }
-}
 
   async selectServices(): Promise<string[]> {
     const { profile } = await inquirer.prompt([
@@ -111,15 +114,14 @@ export class DevEnvironment {
 
     return selectedGroups.flat();
   }
-}
 
   async setupRepositories(services: string[]): Promise<void> {
     const allDeps = new Set<string>();
-    
+
     Logger.step(1, 3, "Resolving service dependencies...");
     for (const service of services) {
       const deps = await this.serviceManager.getServiceDependencies(service);
-      deps.forEach(dep => allDeps.add(dep));
+      deps.forEach((dep) => allDeps.add(dep));
     }
 
     Logger.step(2, 3, "Setting up repositories...");
@@ -133,5 +135,29 @@ export class DevEnvironment {
     }
 
     Logger.step(3, 3, "Repository setup complete");
+  }
+
+  async cleanup(): Promise<void> {
+    const { confirm } = await inquirer.prompt([
+      {
+        type: "confirm",
+        name: "confirm",
+        message:
+          "This will remove the development cluster and all its resources. Continue?",
+        default: false,
+      },
+    ]);
+
+    if (!confirm) {
+      Logger.info("Cleanup cancelled");
+      return;
+    }
+
+    Logger.step(1, 2, "Cleaning up development cluster...");
+    if (!await this.clusterManager.cleanupCluster("quark-dev")) {
+      throw new Error("Failed to cleanup cluster");
+    }
+
+    Logger.step(2, 2, "Cleanup complete");
   }
 }
