@@ -3,7 +3,7 @@ import inquirer from "inquirer";
 import { ClusterManager } from "./cluster-manager.ts";
 import { ServiceManager } from "./service-manager.ts";
 import { ConfigManager } from "./config-manager.ts";
-import { SERVICE_GROUPS, DEVELOPMENT_PROFILES, QUARK_REPOS } from "@quark/q4";
+import { SERVICE_GROUPS, DEVELOPMENT_PROFILES, QUARK_REPOS } from "../q4/const/constants.ts";
 import type { VSCodeWorkspace, ClusterConfig } from "./types.ts";
 import { execSync } from "node:child_process";
 import { exists } from "@std/fs";

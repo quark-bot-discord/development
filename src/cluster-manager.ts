@@ -3,7 +3,7 @@ import { join } from "@std/path";
 import { exists } from "@std/fs";
 import { Logger } from "./logger.ts";
 import type { K3dCluster } from "./types.ts";
-import { SERVICE_GROUPS } from "../q4/constants.ts";
+import { SERVICE_GROUPS } from "../q4/const/constants.ts";
 
 export class ClusterManager {
   private static instance: ClusterManager;

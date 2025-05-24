@@ -4,8 +4,10 @@ import { parseArgs } from "@std/cli";
 import inquirer from "inquirer";
 import { DevEnvironment } from "./src/dev-environment.ts";
 import { ConfigManager } from "./src/config-manager.ts";
-import { SERVICE_GROUPS, QUARK_REPOS } from "./q4/constants.ts";
+import { SERVICE_GROUPS } from "./q4/const/constants.ts";
 import { Logger } from "./src/logger.ts";
+import { getApplicationServices } from "./src/service-loader.ts";
+import { ServiceRunner } from "./src/service-runner.ts";
 
 // Helper function to get all available services
 function getAllServices(): string[] {
@@ -54,6 +56,11 @@ function getServiceNamespace(service: string): string {
   return "other-services";
 }
 
+// Helper function to convert ServiceDefinition command to script
+function commandToScript(command: { type: string; run: string[] }): string {
+  return `${command.type} ${command.run.join(' ')}`;
+}
+
 const devEnv = new DevEnvironment();
 const config = ConfigManager.getInstance();
 
@@ -77,8 +84,8 @@ Commands:
   add    [service]      Add local services (interactive if no service specified)
   remove [service]      Remove local services (interactive if no service specified)
   start                 Start all configured local services
-  cleanup              Clean up development environment
-  list-services        List all available services (used for shell completion)
+  cleanup               Clean up development environment
+  list-services         List all available services (used for shell completion)
 `);
   Deno.exit(0);
 }
@@ -94,6 +101,7 @@ Commands:
 
       case "add": {
         await config.load();
+        const applicationServices = await getApplicationServices();
 
         if (serviceArg) {
           // Direct service addition mode
@@ -116,9 +124,14 @@ Commands:
           }
 
           const repoPath = `/workspace/repos/${serviceArg}`;
+          const appConfig = applicationServices[serviceArg];
+          if (!appConfig) {
+            Logger.error(`No application configuration found for service: ${serviceArg}`);
+            Deno.exit(1);
+          }
           await config.addLocalService(serviceArg, {
             repoPath,
-            script: "start",
+            script: commandToScript(appConfig.command),
             env: {},
             namespace: getServiceNamespace(serviceArg)
           });
@@ -159,9 +172,14 @@ Commands:
               }
               
               const repoPath = `/workspace/repos/${service}`;
+              const appConfig = applicationServices[service];
+              if (!appConfig) {
+                Logger.error(`No application configuration found for service: ${service}`);
+                continue;
+              }
               await config.addLocalService(service, {
                 repoPath,
-                script: "start",
+                script: commandToScript(appConfig.command),
                 env: {},
                 namespace: getServiceNamespace(service)
               });
@@ -230,31 +248,7 @@ Commands:
       case "start": {
         await config.load();
         const localServices = config.getLocalServices();
-
-        if (Object.keys(localServices).length === 0) {
-          Logger.error("No local services configured. Use 'quark add' to add services.");
-          Deno.exit(1);
-        }
-
-        Logger.info("Starting local services...");
-        for (const [service, config] of Object.entries(localServices)) {
-          Logger.info(`\nStarting ${service}...`);
-          const process = new Deno.Command("npm", {
-            args: ["run", config.script],
-            cwd: config.repoPath,
-            stdout: "inherit",
-            stderr: "inherit",
-          });
-
-          try {
-            const child = process.spawn();
-            Logger.success(`${service} started with PID ${child.pid}`);
-          } catch (error) {
-            Logger.error(
-              `Failed to start ${service}: ${error instanceof Error ? error.message : String(error)}`
-            );
-          }
-        }
+        await ServiceRunner.getInstance().startAllServices(localServices);
         break;
       }
       case "list-services": {

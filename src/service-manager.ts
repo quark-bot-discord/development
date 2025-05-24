@@ -5,7 +5,7 @@ import type { KubernetesConfig } from "./types.ts";
 type ServiceType = "core-services" | "app-services" | "other-services";
 import { join } from "@std/path";
 import { exists } from "@std/fs";
-import { SERVICE_GROUPS } from "../q4/constants.ts";
+import { SERVICE_GROUPS } from "../q4/const/constants.ts";
 
 export class ServiceManager {
   private static instance: ServiceManager;
