@@ -214,6 +214,36 @@ export class DevEnvironment {
     // Select services
     const services = await this.selectServices();
 
+    // Check if there are any potential submodule updates
+    try {
+      const fetchCmd = new Deno.Command('git', {
+        args: ['submodule', 'foreach', 'git', 'fetch'],
+      });
+      await fetchCmd.output();
+
+      const statusCmd = new Deno.Command('git', {
+        args: ['submodule', 'foreach', 'git', 'status', '-uno'],
+        stdout: 'piped',
+      });
+      const { stdout } = await statusCmd.output();
+      const status = new TextDecoder().decode(stdout);
+      
+      if (status.includes('behind')) {
+        const { updateSubmodules } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'updateSubmodules',
+          message: 'Updates available for submodules. Would you like to update them before continuing?',
+          default: true,
+        }]);
+
+        if (updateSubmodules) {
+          await this.updateSubmodules(false); // Don't auto-commit during setup
+        }
+      }
+    } catch (error) {
+      Logger.warn(`Failed to check submodule status: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
     // Set up cluster
     await this.setupCluster(services);
 
@@ -278,6 +308,75 @@ export class DevEnvironment {
       } else {
         Logger.error(`Failed to clone ${service}: ${String(error)}`);
       }
+      throw error;
+    }
+  }
+
+  async updateSubmodules(autoCommit = true) {
+    Logger.step(1, 3, "Checking submodule status...");
+    
+    try {
+      // First check if we have any submodules that aren't initialized
+      const initCmd = new Deno.Command('git', {
+        args: ['submodule', 'status'],
+        stdout: 'piped',
+      });
+      const { stdout: initStdout } = await initCmd.output();
+      const status = new TextDecoder().decode(initStdout);
+      
+      if (status.includes('-')) {
+        Logger.info("Initializing uninitialized submodules...");
+        await new Deno.Command('git', {
+          args: ['submodule', 'init'],
+        }).output();
+      }
+
+      Logger.step(2, 3, "Updating submodules to latest versions...");
+      const updateCmd = new Deno.Command('git', {
+        args: ['submodule', 'update', '--remote', '--recursive'],
+        stderr: 'piped',
+      });
+      const updateResult = await updateCmd.output();
+      
+      if (updateResult.stderr.length > 0) {
+        const error = new TextDecoder().decode(updateResult.stderr);
+        if (error.includes("Please make sure you have the correct access rights")) {
+          throw new Error("Access denied. Please check your Git credentials and try again.");
+        }
+      }
+
+      Logger.step(3, 3, "Checking for changes...");
+      const statusCmd = new Deno.Command('git', {
+        args: ['status', '--porcelain'],
+        stdout: 'piped',
+      });
+      const { stdout } = await statusCmd.output();
+      const changes = new TextDecoder().decode(stdout);
+
+      if (changes.length > 0) {
+        if (autoCommit) {
+          Logger.info("Changes detected, committing updates...");
+          await new Deno.Command('git', {
+            args: ['add', '.'],
+          }).output();
+          
+          await new Deno.Command('git', {
+            args: ['commit', '-m', 'chore: update submodules'],
+          }).output();
+          
+          await new Deno.Command('git', {
+            args: ['push'],
+          }).output();
+
+          Logger.success("Submodules updated and changes pushed successfully");
+        } else {
+          Logger.info("Changes detected in submodules. Use git status to review changes.");
+        }
+      } else {
+        Logger.success("All submodules are up to date");
+      }
+    } catch (error) {
+      Logger.error(`Failed to update submodules: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
