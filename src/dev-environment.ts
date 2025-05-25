@@ -338,10 +338,12 @@ export class DevEnvironment {
       });
       const updateResult = await updateCmd.output();
       
-      if (updateResult.stderr.length > 0) {
+      if (!updateResult.success) {
         const error = new TextDecoder().decode(updateResult.stderr);
         if (error.includes("Please make sure you have the correct access rights")) {
           throw new Error("Access denied. Please check your Git credentials and try again.");
+        } else {
+          throw new Error(`Failed to update submodules: ${error}`);
         }
       }
 
