@@ -1,0 +1,33 @@
+name: Update Submodules
+
+on:
+  schedule:
+    - cron: '* * * * *' 
+
+jobs:
+  update:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Git config
+        run: |
+          git config --global user.name 'veryCrunchy'
+          git config --global user.email 'me@verycrunchy.dev'
+
+      - name: Check and update submodules
+        run: |
+          # Check if there are any updates available
+          git submodule update --remote --recursive
+          if [[ -n $(git status --porcelain) ]]; then
+            git add .
+            git commit -m "task: update submodules"
+            git push
+            echo "::notice::Submodules were updated"
+          else
+            # Exit successfully but quietly if no updates
+            exit 0
+          fi
