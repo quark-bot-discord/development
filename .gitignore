@@ -1,0 +1,5 @@
+node_modules
+repos
+kube
+quark-dev-config.json
+quark-dev.code-workspace

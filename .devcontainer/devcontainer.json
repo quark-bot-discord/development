@@ -1,0 +1,81 @@
+{
+  "name": "Quark Development Environment",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "mounts": [
+    // Docker socket for k3d
+
+    // Persistent data volumes
+    "source=workspace-data,target=/home/vscode/.local/share,type=volume",
+    "source=deno-dir,target=/home/vscode/.cache/deno,type=volume",
+    "source=kube-data,target=/workspace/kube,type=volume",
+
+    // Main workspace folder for cloned repos
+    "source=repos-data,target=/workspace/repos,type=volume",
+
+    // Hidden development files (quark CLI source)
+    "source=${localWorkspaceFolder}/.devcontainer,target=/workspace/.devcontainer,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/src,target=/workspace/src,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/scripts,target=/workspace/scripts,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/main.ts,target=/workspace/main.ts,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/deno.json,target=/workspace/deno.json,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/quark-k8s,target=/workspace/quark-k8s,type=bind,consistency=cached"
+  ],
+  "remoteEnv": {
+    "KUBECONFIG": "/workspace/kube/kubeconfig-quark-dev.yaml",
+    "DOCKER_GROUP_ID": "999"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "1.28",
+      "helm": "latest",
+      "minikube": "none"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": false,
+      "installOhMyZsh": false,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22",
+      "nodeGypDependencies": true
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "denoland.vscode-deno",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "ms-azuretools.vscode-docker",
+        "github.copilot",
+        "github.copilot-chat",
+        "github.vscode-pull-request-github"
+      ],
+      "settings": {
+        "deno.enable": true,
+        "deno.lint": true,
+        "files.exclude": {
+          ".devcontainer": false,
+          "src": false,
+          "scripts": false,
+          "main.ts": false,
+          "deno.*": false,
+          "quark-k8s": false,
+          ".*": false
+        }
+      }
+    }
+  },
+  "updateRemoteUserUID": true,
+  "postStartCommand": "sudo /workspace/.devcontainer/setup.sh && exec bash",
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@latest --activate"
+}
