@@ -226,9 +226,9 @@ export class DevEnvironment {
         stdout: 'piped',
       });
       const { stdout } = await statusCmd.output();
-      const status = new TextDecoder().decode(stdout);
+      const submoduleStatus = new TextDecoder().decode(stdout);
       
-      if (status.includes('behind')) {
+      if (submoduleStatus.includes('behind')) {
         const { updateSubmodules } = await inquirer.prompt([{
           type: 'confirm',
           name: 'updateSubmodules',
