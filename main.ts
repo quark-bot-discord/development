@@ -86,6 +86,7 @@ Commands:
   start                 Start all configured local services
   cleanup               Clean up development environment
   list-services         List all available services (used for shell completion)
+  update-submodules     Update all submodules to their latest versions
 `);
   Deno.exit(0);
 }
@@ -257,6 +258,16 @@ Commands:
       }
       case "cleanup": {
         await devEnv.cleanup();
+        break;
+      }
+      case "update-submodules": {
+        const { autoCommit } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'autoCommit',
+          message: 'Automatically commit and push submodule updates?',
+          default: true,
+        }]);
+        await devEnv.updateSubmodules(autoCommit);
         break;
       }
 
