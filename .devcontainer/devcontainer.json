@@ -17,6 +17,11 @@
     // Main workspace folder for cloned repos
     "source=repos-data,target=/workspace/repos,type=volume",
 
+ // Git credentials and SSH keys (bind to host)
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.gnupg,target=/home/vscode/.gnupg,type=bind,consistency=cached",
+    "source=git-data,target=/home/vscode/.git,type=volume",
+
     // Hidden development files (quark CLI source)
     "source=${localWorkspaceFolder}/.devcontainer,target=/workspace/.devcontainer,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/src,target=/workspace/src,type=bind,consistency=cached",
@@ -27,7 +32,7 @@
   ],
   "remoteEnv": {
     "KUBECONFIG": "/workspace/kube/kubeconfig-quark-dev.yaml",
-    "DOCKER_GROUP_ID": "999"
+    "DOCKER_GROUP_ID": "999" 
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
@@ -48,6 +53,14 @@
     "ghcr.io/devcontainers/features/node:1": {
       "version": "22",
       "nodeGypDependencies": true
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "installDirectlyFromGitHubRelease": true,
+      "version": "latest"
     }
   },
   "customizations": {
