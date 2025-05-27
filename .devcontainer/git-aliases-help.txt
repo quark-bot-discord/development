@@ -1,0 +1,74 @@
+Git Aliases Help
+================
+
+The following Git aliases are configured in your development environment:
+
+Core Commands:
+  st       = status
+             Show the working tree status (modified, staged, untracked files)
+             Usage: git st
+
+  co       = checkout
+             Switch branches or restore working tree files
+             Usage: git co <branch-name> | git co <file>
+
+  br       = branch
+             List, create, or delete branches
+             Usage: git br | git br <new-branch> | git br -d <branch>
+
+  ci       = commit
+             Record changes to the repository
+             Usage: git ci -m "commit message"
+
+Utility Commands:
+  unstage  = reset HEAD --
+             Remove files from the staging area (keeps your changes!)
+             Safe alternative to undo 'git add' - changes remain in working directory
+             Usage: git unstage <file>
+
+  last     = log -1 HEAD
+             Show the last commit information
+             Usage: git last
+
+  visual   = !gitk
+             Launch the visual Git history viewer (if available)
+             Usage: git visual
+
+  graph    = log --oneline --graph --decorate --all
+             Display a visual commit graph with branch relationships
+             Usage: git graph
+
+  pushf    = push --force-with-lease
+             Safely force push (only when you need to force push!)
+             Checks if remote has changed since your last fetch
+             Usage: git pushf
+             Note: Use regular 'git push' for normal commits
+
+Help:
+  aliases  = Show this help text
+             Display information about all configured Git aliases
+             Usage: git aliases
+
+Examples:
+---------
+  git st                    # Check status
+  git add file.txt          # Stage a file
+  git unstage file.txt      # Unstage it (keeps changes!)
+  git co -b feature/new     # Create and switch to new branch
+  git st                    # Check what files are modified
+  git ci -m "Add feature"   # Commit changes
+  git push                  # Normal push (use this most of the time)
+  git pushf                 # Force push safely (only after rebase/amend)
+  git graph                 # View commit history visually
+
+Quick Reference:
+---------------
+Most common workflow:
+  git st → git add . → git ci -m "message" → git push
+
+When you need to force push (after rebase/amend):
+  git st → git rebase -i → git pushf
+
+For more Git help, use:
+  git help <command>        # Detailed help for specific commands
+  man git                   # Full Git manual
