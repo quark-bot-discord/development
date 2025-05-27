@@ -38,6 +38,9 @@ quark start
 # Update submodules to latest versions
 quark update-submodules
 
+# Show git aliases and help
+quark git
+
 # Clean up development environment
 quark cleanup
 
@@ -52,25 +55,32 @@ The `quark` command is automatically available in the dev container. All depende
 
 The environment provides several developer-focused features:
 
-1. **VS Code Integration**:
+1. **Automatic Git Setup**:
+   - Git user configuration
+   - SSH key authentication
+   - GPG signing configuration
+   - Useful git aliases (`git st`, `git co`, `git pushf`, etc.)
+   - GitHub CLI integration
+
+2. **VS Code Integration**:
    - Automatic workspace configuration
    - Recommended extensions
    - Debug configurations
    - File exclusion patterns
 
-2. **Development Tooling**:
+3. **Development Tooling**:
    - Hot reload for local development
    - Automatic service dependency resolution
    - Submodule management
    - Service health monitoring
 
-3. **Flexible Configuration**:
+4. **Flexible Configuration**:
    - Multiple development profiles
    - Custom service selection
    - Local or remote cluster support
    - Environment variable management
 
-4. **Debug Support**: 
+5. **Debug Support**: 
    - Port forwarding for remote debugging
    - Log aggregation across services
    - Kubernetes integration
@@ -110,7 +120,8 @@ The setup process will:
 
 The environment comes with several pre-configured development profiles:
 
-- **Bot Development**: Beta bot services for bot development
+- **Webhook Development**: Services for webhook development
+- **Bot Development**: Services for bot development
 - **Website Development**: Website services for frontend development
 - **Gateway Development**: Gateway services for API development
 - **Helper Development**: Helper bot development environment
@@ -202,3 +213,22 @@ Development and administrative tools:
 - Register Emojis
 - Workers
 - K8s Health Check
+
+## Git Configuration
+
+The development container automatically configures Git with useful aliases and settings.
+
+### Pre-configured Git Aliases
+The container includes helpful git aliases:
+
+```bash
+git st        # git status
+git co        # git checkout
+git br        # git branch
+git ci        # git commit
+git unstage   # remove from staging (keeps changes)
+git pushf     # safe force push
+git graph     # visual commit history
+```
+
+Use `quark git` to see the complete help with examples.
