@@ -169,7 +169,7 @@ export class DevEnvironment {
       folders: [
         {
           name: "q4",
-          path: "/workspace"
+          path: "/workspace/q4"
         },
         ...appServices.map((service) => ({
           name: service,
