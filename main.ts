@@ -87,6 +87,7 @@ Commands:
   cleanup               Clean up development environment
   list-services         List all available services (used for shell completion)
   update-submodules     Update all submodules to their latest versions
+  git                   Display Git aliases and usage help
 `);
   Deno.exit(0);
 }
@@ -268,6 +269,17 @@ Commands:
           default: true,
         }]);
         await devEnv.updateSubmodules(autoCommit);
+        break;
+      }
+      case "git": {
+        // Read and display the git aliases help file
+        try {
+          const helpPath = new URL("./.devcontainer/git-aliases-help.txt", import.meta.url).pathname;
+          const helpText = await Deno.readTextFile(helpPath);
+          Logger.info(helpText);
+        } catch (_error) {
+          Logger.error("Git help file not found. Make sure to run the git setup script in your dev container.");
+        }
         break;
       }
 

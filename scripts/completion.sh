@@ -32,7 +32,7 @@ _quark_completions()
 
     # Handle top-level commands
     if [[ $COMP_CWORD == 1 ]]; then
-        local commands="setup add remove cleanup start list-services update-submodules"
+        local commands="setup add remove cleanup start list-services update-submodules git"
         COMPREPLY=($(compgen -W "$commands" -- "$cur"))
         return 0
     fi

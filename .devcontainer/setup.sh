@@ -43,6 +43,9 @@ newgrp docker << 'INNEREOF'
 echo 'export PATH="/home/vscode/.deno/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH="/home/vscode/.deno/bin:$PATH"' >> ~/.profile
 
+# Setup Git configuration
+/workspace/.devcontainer/setup-git.sh
+
 # Setup command completion
 mkdir -p "$HOME/.local/share/bash-completion/completions"
 cp /workspace/scripts/completion.sh "$HOME/.local/share/bash-completion/completions/quark"
@@ -68,12 +71,13 @@ EOF
 
 echo "✅ Development environment setup complete!"
 echo
-echo "To complete the setup, run:"
-echo "  quark setup   - Set up kubernetes and configure services"
+echo "First set up Kubernetes: quark setup"
 echo
 echo "Then you can use:"
 echo "  quark add     - Add local services"
-echo "  quark remove  - Remove local services"
+echo "  quark remove  - Remove local services" 
 echo "  quark start   - Start configured services"
+echo "  quark git     - Show git aliases help"
 echo
 echo "Try 'quark --help' for more information."
+echo "If for some reason quark is not available, you can run: ./install.sh"
