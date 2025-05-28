@@ -129,7 +129,7 @@ export class DevEnvironment {
 
     Logger.step(1, 3, "Resolving service dependencies...");
     for (const service of services) {
-      const deps = await this.serviceManager.getServiceDependencies(service);
+      const deps = await this.serviceManager.getServiceDependenciesFromDefinitions(service);
       deps.forEach((dep) => allDeps.add(dep));
     }
 

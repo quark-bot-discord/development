@@ -48,7 +48,9 @@ function getServiceNamespace(service: string): string {
     if (group.services.includes(service)) {
       switch (type) {
         case "core": return "core-services";
-        case "apps": return "app-services";
+        case "apps": 
+        case "web": 
+        case "tools": return "app-services";
         default: return "other-services";
       }
     }
@@ -89,7 +91,7 @@ Commands:
   update-submodules     Update all submodules to their latest versions
   git                   Display Git aliases and usage help
 `);
-  Deno.exit(0);
+  self.close();
 }
 
 // Main command handling
@@ -133,7 +135,7 @@ Commands:
           }
           await config.addLocalService(serviceArg, {
             repoPath,
-            script: commandToScript(appConfig.command),
+            script: commandToScript(appConfig.command!),
             env: {},
             namespace: getServiceNamespace(serviceArg)
           });
@@ -181,7 +183,7 @@ Commands:
               }
               await config.addLocalService(service, {
                 repoPath,
-                script: commandToScript(appConfig.command),
+                script: commandToScript(appConfig.command!),
                 env: {},
                 namespace: getServiceNamespace(service)
               });
@@ -293,4 +295,5 @@ Commands:
     );
     Deno.exit(1);
   }
+  self.close();
 })();

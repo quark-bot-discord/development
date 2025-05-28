@@ -49,7 +49,7 @@ export async function getApplicationServices(): Promise<Record<string, ServiceDe
         }
         
         // Validate that it looks like a ServiceDefinition
-        if (configExport && typeof configExport === 'object' && configExport.name && configExport.command) {
+        if (configExport && typeof configExport === 'object' && configExport.name && configExport.type) {
           configs[serviceName] = configExport as ServiceDefinition;
         } else {
           console.warn(`Skipping ${dirEntry.name}: No valid ServiceDefinition found`);

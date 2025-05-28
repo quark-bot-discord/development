@@ -1,16 +1,14 @@
-// filepath: /home/crunchy/dev/quark/development/src/service-manager.ts
 import { parseAllDocuments } from "yaml";
 import { Logger } from "./logger.ts";
 import type { KubernetesConfig } from "./types.ts";
 type ServiceType = "core-services" | "app-services" | "other-services";
-import { join } from "@std/path";
-import { exists } from "@std/fs";
 import { SERVICE_GROUPS } from "../q4/const/constants.ts";
+import { getInfrastructureServices } from "./infra-service-loader.ts";
+import { getApplicationServices } from "./service-loader.ts";
 
 export class ServiceManager {
   private static instance: ServiceManager;
   private manifestCache: Map<string, KubernetesConfig[]> = new Map();
-  private static readonly K8S_ROOT = "quark-k8s";
   private static readonly SERVICE_DIRS = ["core-services", "app-services", "other-services"];
 
   // Map to track service dependencies
@@ -76,7 +74,9 @@ export class ServiceManager {
       if (group.services.includes(service)) {
         switch (type) {
           case "core": return "core-services";
-          case "apps": return "app-services";
+          case "apps": 
+          case "web": 
+          case "tools": return "app-services";
           default: return "other-services";
         }
       }
@@ -84,113 +84,78 @@ export class ServiceManager {
     return "other-services";
   }
 
-  async findServiceManifest(service: string): Promise<string | null> {
-    // First check in the expected directory based on service type
-    const primaryDir = this.getServiceType(service);
-    const primaryPath = join(ServiceManager.K8S_ROOT, primaryDir, `${service}.yaml`);
-    
-    try {
-      if (await exists(primaryPath)) {
-        return primaryPath;
-      }
-    } catch {
-      // Ignore error and continue searching
-    }
-
-    // If not found in primary location, check all directories
-    for (const dir of ServiceManager.SERVICE_DIRS) {
-      if (dir === primaryDir) continue; // Already checked
-      
-      const manifestPath = join(ServiceManager.K8S_ROOT, dir, `${service}.yaml`);
-      try {
-        if (await exists(manifestPath)) {
-          Logger.info(`Service ${service} found in unexpected directory: ${dir}`);
-          return manifestPath;
-        }
-      } catch {
-        continue;
-      }
-    }
-    
-    return null;
-  }
-
-  async getServiceDependencies(serviceName: string): Promise<string[]> {
+  /**
+   * Get service dependencies from service definitions
+   */
+  async getServiceDependenciesFromDefinitions(serviceName: string): Promise<string[]> {
     // Check cache first
     if (this.dependencyGraph.has(serviceName)) {
       return Array.from(this.dependencyGraph.get(serviceName)!);
     }
 
     const dependencies = new Set<string>();
-    const processedConfigs = new Set<string>();
-    
-    // Helper function to process a service's dependencies
-    const processService = async (service: string): Promise<void> => {
-      if (processedConfigs.has(service)) return;
-      processedConfigs.add(service);
 
-      const manifestPath = await this.findServiceManifest(service);
-      if (!manifestPath) {
-        Logger.error(`No manifest found for service: ${service}`);
-        return;
-      }
+    try {
+      // Load infrastructure and application services
+      const [infraServices, appServices] = await Promise.all([
+        getInfrastructureServices(),
+        getApplicationServices()
+      ]);
 
-      const configs = await this.loadK8sConfig(manifestPath);
-      if (configs.length === 0) return;
-
-      // Process each config in the manifest
-      for (const config of configs) {
-        // Extract dependencies from container environments
-        for (const container of config.spec?.template?.spec?.containers || []) {
-          for (const env of container.env || []) {
-            const envName = env.name.toUpperCase();
-            const envValue = env.value || '';
-
-            // Check for direct service dependencies
-            if (envName.includes('REDIS_') || envValue.includes('redis')) dependencies.add('redis');
-            if (envName.includes('MYSQL_') || envName.includes('DB_') || envValue.includes('mysql')) dependencies.add('mysql');
-            if (envName.includes('NATS_') || envValue.includes('nats')) dependencies.add('nats');
-            if (envName.includes('ELASTICSEARCH_') || envName.includes('ES_') || envValue.includes('elastic-search')) dependencies.add('elastic-search');
-            if (envName.includes('AEROSPIKE_') || envValue.includes('aerospike')) dependencies.add('aerospike');
-            
-            // Check for inter-service dependencies
-            if (envValue.includes('gateway')) {
-              Object.values(SERVICE_GROUPS).forEach(group => {
-                group.services
-                  .filter(s => s.includes('gateway'))
-                  .forEach(s => dependencies.add(s));
-              });
-            }
-
-            // Check valueFrom references
-            if (env.valueFrom) {
-              if (env.valueFrom.configMapKeyRef?.name) {
-                dependencies.add(`configmap:${env.valueFrom.configMapKeyRef.name}`);
-              }
-              if (env.valueFrom.secretKeyRef?.name) {
-                dependencies.add(`secret:${env.valueFrom.secretKeyRef.name}`);
-              }
-            }
-          }
-
-          // Check for volume dependencies
-          for (const volume of config.spec?.template?.spec?.volumes || []) {
-            if (volume.configMap?.name) {
-              dependencies.add(`configmap:${volume.configMap.name}`);
-            }
-            if (volume.secret?.secretName) {
-              dependencies.add(`secret:${volume.secret.secretName}`);
-            }
-            if (volume.persistentVolumeClaim?.claimName) {
-              dependencies.add(`pvc:${volume.persistentVolumeClaim.claimName}`);
-            }
+      // Check if it's an infrastructure service
+      const infraConfig = infraServices[serviceName];
+      if (infraConfig) {
+        // Infrastructure services typically don't have dependencies on other services
+        // but they might depend on storage volumes
+        if (infraConfig.volumes) {
+          for (const volume of infraConfig.volumes) {
+            dependencies.add(`pvc:${volume.name}`);
           }
         }
+      } else {
+        // Check if it's an application service
+        const appConfig = appServices[serviceName];
+        if (appConfig) {
+          // Extract dependencies from environment variables
+          for (const [key, value] of Object.entries(appConfig.env || {})) {
+            const stringValue = String(value);
+            
+            // Look for service references in environment variables
+            if (stringValue.includes('.core-services')) {
+              // Extract service name from host references like "redis.core-services"
+              const hostMatch = stringValue.match(/([a-z-]+)\.core-services/);
+              if (hostMatch) {
+                dependencies.add(hostMatch[1]);
+              }
+            }
+            
+            // Look for other service host references
+            const serviceHostPatterns = [
+              /REDIS_HOST.*redis/i,
+              /MYSQL_HOST.*mysql/i,
+              /DATABASE_HOST.*mysql/i,
+              /NATS.*HOST.*nats/i,
+              /ELASTIC.*HOST.*elastic/i,
+              /AEROSPIKE.*HOST.*aerospike/i
+            ];
+            
+            for (const pattern of serviceHostPatterns) {
+              if (pattern.test(key) || pattern.test(stringValue)) {
+                if (stringValue.includes('redis')) dependencies.add('redis');
+                if (stringValue.includes('mysql')) dependencies.add('mysql');
+                if (stringValue.includes('nats')) dependencies.add('nats');
+                if (stringValue.includes('elastic')) dependencies.add('elastic-search');
+                if (stringValue.includes('aerospike')) dependencies.add('aerospike');
+              }
+            }
+          }
+        } else {
+          Logger.warn(`No service definition found for ${serviceName}, unable to resolve dependencies`);
+        }
       }
-    };
-
-    // Process the main service
-    await processService(serviceName);
+    } catch (err) {
+      Logger.error(`Failed to get dependencies for ${serviceName}: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     // Cache the results
     this.dependencyGraph.set(serviceName, dependencies);

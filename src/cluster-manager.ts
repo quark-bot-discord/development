@@ -1,17 +1,23 @@
 import { execSync } from "node:child_process";
-import { join } from "@std/path";
-import { exists } from "@std/fs";
 import { Logger } from "./logger.ts";
 import type { K3dCluster } from "./types.ts";
 import { SERVICE_GROUPS } from "../q4/const/constants.ts";
+import { getInfrastructureServices } from "./infra-service-loader.ts";
+import { getApplicationServices } from "./service-loader.ts";
+import { ManifestGenerator } from "./manifest-generator.ts";
+import { ServiceManager } from "./service-manager.ts";
 
 export class ClusterManager {
   private static instance: ClusterManager;
   private currentCluster: K3dCluster | null = null;
-  private static readonly K8S_MANIFESTS_DIR = "quark-k8s";
   private static readonly SERVICE_DIRS = ["core-services", "app-services", "other-services"];
+  private manifestGenerator: ManifestGenerator;
+  private serviceManager: ServiceManager;
 
-  private constructor() {}
+  private constructor() {
+    this.manifestGenerator = new ManifestGenerator();
+    this.serviceManager = ServiceManager.getInstance();
+  }
 
   static getInstance(): ClusterManager {
     if (!ClusterManager.instance) {
@@ -109,80 +115,63 @@ export class ClusterManager {
       }
     }
 
-    // Apply core services first
-    Logger.info("Applying core service configurations...");
+    // Load infrastructure services and apply core services first
+    Logger.info("Loading infrastructure service configurations...");
+    const infraServices = await getInfrastructureServices();
+    
+    Logger.info("Applying core infrastructure services...");
     const coreServices = SERVICE_GROUPS.core.services;
 
-    // First apply namespace config
-    const namespaceManifest = join(Deno.cwd(), ClusterManager.K8S_MANIFESTS_DIR, "core-services", "namespace.yaml");
-    try {
-      if (await exists(namespaceManifest)) {
-        if (!this.applyManifest(namespaceManifest, "core-services")) {
-          throw new Error("Failed to apply core services namespace configuration");
-        }
-        Logger.success("Applied core services namespace configuration");
-      }
-    } catch (err) {
-      Logger.error(`Failed to apply core namespace: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    // Then apply core services
-    for (const service of coreServices) {
-      const manifestPath = join(Deno.cwd(), ClusterManager.K8S_MANIFESTS_DIR, "core-services", `${service}.yaml`);
-      try {
-        if (await exists(manifestPath)) {
-          if (!this.applyManifest(manifestPath, "core-services")) {
-            throw new Error(`Failed to apply core service: ${service}`);
+    for (const serviceName of coreServices) {
+      const infraConfig = infraServices[serviceName];
+      if (infraConfig) {
+        try {
+          Logger.info(`Generating manifests for infrastructure service: ${serviceName}`);
+          const manifests = this.manifestGenerator.generateInfraServiceManifests(infraConfig);
+          
+          if (await this.manifestGenerator.applyManifests(manifests)) {
+            Logger.success(`Applied infrastructure service: ${serviceName}`);
+          } else {
+            Logger.error(`Failed to apply infrastructure service: ${serviceName}`);
+            // Continue with other services instead of failing completely
+            continue;
           }
-          Logger.success(`Applied core service: ${service}`);
-        } else {
-          Logger.info(`Core service manifest not found: ${manifestPath}`);
+        } catch (err) {
+          Logger.error(`Failed to generate/apply manifests for ${serviceName}: ${err instanceof Error ? err.message : String(err)}`);
+          continue;
         }
-      } catch (err) {
-        Logger.error(`Failed to apply core service ${service}: ${err instanceof Error ? err.message : String(err)}`);
-        // Continue with other core services instead of failing completely
-        continue;
+      } else {
+        Logger.warn(`No service definition found for infrastructure service: ${serviceName}`);
       }
     }
 
-    // Try to apply any secrets if they exist
-    const secretsPath = join(Deno.cwd(), ClusterManager.K8S_MANIFESTS_DIR, "core-services", "secrets");
-    try {
-      if (await exists(secretsPath)) {
-        const command = `find "${secretsPath}" -name "*.yaml" -exec kubectl apply -f {} -n core-services \\;`;
-        execSync(command, { stdio: "inherit" });
-        Logger.success("Applied core service secrets");
-      }
-    } catch (_err) {
-      Logger.info("No core service secrets found or failed to apply them");
-    }
-
-    // Then apply selected service manifests
-    Logger.info("Applying service configurations...");
+    // Apply selected application services using service definitions where possible
+    Logger.info("Applying application service configurations...");
+    const appServices = await getApplicationServices();
+    
     for (const service of services) {
       let applied = false;
       
-      // Try each service directory in order
-      for (const dir of ClusterManager.SERVICE_DIRS) {
-        const manifestPath = join(Deno.cwd(), ClusterManager.K8S_MANIFESTS_DIR, dir, `${service}.yaml`);
-        
+      // First, try to use service definition if available
+      const appConfig = appServices[service];
+      if (appConfig) {
         try {
-          if (await exists(manifestPath)) {
-            if (this.applyManifest(manifestPath, dir)) {
-              Logger.success(`Applied ${service} configuration from ${dir}`);
-              applied = true;
-              break;
-            }
+          Logger.info(`Generating configuration manifests for application service: ${service}`);
+          const serviceType = this.serviceManager.getServiceType(service);
+          const manifests = this.manifestGenerator.generateAppServiceManifests(appConfig, serviceType);
+          
+          if (manifests.length > 0 && await this.manifestGenerator.applyManifests(manifests)) {
+            Logger.success(`Applied application service configuration: ${service}`);
+            applied = true;
           }
         } catch (err) {
-          Logger.error(`Error checking/applying manifest for ${service} in ${dir}: ${err instanceof Error ? err.message : String(err)}`);
-          continue;
+          Logger.error(`Failed to apply service definition for ${service}: ${err instanceof Error ? err.message : String(err)}`);
+          // Fall back to existing manifests
         }
       }
 
       if (!applied) {
-        Logger.error(`Failed to find or apply configuration for ${service}`);
-        throw new Error(`Failed to apply configuration for ${service}`);
+        Logger.warn(`No service definition found for application service: ${service}`);
       }
     }
   }

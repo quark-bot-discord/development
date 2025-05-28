@@ -1,15 +1,19 @@
 #!/bin/bash
 
-# Get all available services from k8s directories
+# Get all available services from service definitions
 _get_available_services() {
     local services=""
-    # Search in app-services
-    services+=" $(find /workspace/quark-k8s/app-services -name "*.yaml" -not -name "namespace.yaml" -exec basename {} .yaml \;)"
-    # Search in core-services
-    services+=" $(find /workspace/quark-k8s/core-services -name "*.yaml" -not -name "namespace.yaml" -exec basename {} .yaml \;)"
-    # Search in other-services
-    services+=" $(find /workspace/quark-k8s/other-services -name "*.yaml" -not -name "namespace.yaml" -exec basename {} .yaml \;)"
-    echo "$services"
+    
+    # Get services from TypeScript service definitions (new approach)
+    if [[ -d "/workspace/q4" ]]; then
+        # Application services from q4/ directory
+        services+=" $(find /workspace/q4 -name "*.ts" -not -path "*/const/*" -not -path "*/infra/*" -exec basename {} .ts \;)"
+        # Infrastructure services from q4/infra/ directory  
+        services+=" $(find /workspace/q4/infra -name "*.ts" -exec basename {} .ts \;)"
+    fi
+    
+    # Remove duplicates and sort
+    echo "$services" | tr ' ' '\n' | sort -u | tr '\n' ' '
 }
 
 # Get configured local services

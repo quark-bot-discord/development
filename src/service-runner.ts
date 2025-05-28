@@ -19,6 +19,10 @@ export class ServiceRunner {
     const { command } = appConfig;
     const cwd = `/workspace/repos/${service}`;
 
+    if (!command) {
+      throw new Error(`No command specified for service: ${service}`);
+    }
+
     return new Deno.Command(command.type, {
       args: command.run,
       cwd,
