@@ -2,12 +2,12 @@
 
 import { parseArgs } from "@std/cli";
 import inquirer from "inquirer";
-import { DevEnvironment } from "./src/dev-environment.ts";
-import { ConfigManager } from "./src/config-manager.ts";
+import { DevEnvironment } from "./src/development/dev-environment.ts";
+import { ConfigManager } from "./src/core/config-manager.ts";
 import { SERVICE_GROUPS } from "./q4/const/constants.ts";
-import { Logger } from "./src/logger.ts";
-import { getApplicationServices } from "./src/service-loader.ts";
-import { ServiceRunner } from "./src/service-runner.ts";
+import { Logger } from "./src/development/logger.ts";
+import { getApplicationServices } from "./src/services/service-loader.ts";
+import { ServiceRunner } from "./src/services/service-runner.ts";
 
 // Helper function to get all available services
 function getAllServices(): string[] {

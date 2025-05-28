@@ -1,7 +1,7 @@
 
 import { exists } from "@std/fs";
-import { Logger } from "./logger.ts";
-import type { LocalServiceConfig, ServiceConfig } from "./types.ts";
+import { Logger } from "../development/logger.ts";
+import type { LocalServiceConfig, ServiceConfig } from "../types/types.ts";
 
 export class ConfigManager {
   private static instance: ConfigManager;

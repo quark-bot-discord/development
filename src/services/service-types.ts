@@ -30,16 +30,24 @@ export interface ServiceDefinition {
   image?: string;
   replicas?: number;
   args?: string[];
+  namespace?: string;
+  serviceType?: 'ClusterIP' | 'NodePort' | 'LoadBalancer';
   ports?: {
     name: string;
     port: number;
     targetPort?: number | string;
+    containerPort?: number;
+    servicePort?: number;
+    protocol?: string;
   }[];
   volumes?: {
     name: string;
     mountPath: string;
     size?: string;
     hostPath?: string;
+    readOnly?: boolean;
+    configMap?: string;
+    secret?: string;
   }[];
   secrets?: Record<string, Record<string, string>>;
   resources?: {
@@ -58,6 +66,25 @@ export interface ServiceDefinition {
     sysctls?: Array<{
       name: string;
       value: string;
+    }>;
+  };
+
+  // Health check configuration
+  healthCheck?: {
+    path?: string;
+    port?: number;
+    initialDelaySeconds?: number;
+    periodSeconds?: number;
+  };
+
+  // Ingress configuration
+  ingress?: {
+    hosts: string[];
+    path?: string;
+    annotations?: Record<string, string>;
+    tls?: Array<{
+      secretName: string;
+      hosts: string[];
     }>;
   };
 

@@ -1,6 +1,6 @@
-import { Logger } from "./logger.ts";
+import { Logger } from "../development/logger.ts";
 import { getApplicationServices } from "./service-loader.ts";
-import type { LocalServiceConfig } from "./types.ts";
+import type { LocalServiceConfig } from "../types/types.ts";
 import type { ServiceDefinition } from "./service-types.ts";
 
 export class ServiceRunner {

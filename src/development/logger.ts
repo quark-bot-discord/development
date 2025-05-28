@@ -21,6 +21,10 @@ export class Logger {
     console.error(chalk.red(`✖ ${message}`));
   }
 
+  static debug(message: string): void {
+    console.log(chalk.gray(`[DEBUG] ${message}`));
+  }
+
   static step(step: number, total: number, message: string): void {
     console.log(chalk.cyan(`[${step}/${total}] ${message}`));
   }

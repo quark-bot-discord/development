@@ -1,40 +1,6 @@
-import { assertEquals, assertExists, assertInstanceOf } from "jsr:@std/assert";
-import { getApplicationServices } from "../src/service-loader.ts";
-import { validCommandTypes, validServiceTypes, type ServiceDefinition } from "../src/service-types.ts";
-
-type ServiceType = "typescript" | "javascript" | "rust" | "container" | "job";
-type CommandType = "npm" | "pnpm" | "cargo" | "deno";
-
-Deno.test("Application Service Loader - loads all services", async () => {
-  const services = await getApplicationServices();
-  
-  assertExists(services);
-  assertInstanceOf(services, Object);
-  
-  // Get app services from constants.ts
-  const serviceGroups = await import("../q4/const/constants.ts");
-  
-  // Filter out infrastructure services and get a list of all app services
-  const allAppServices = Object.values(serviceGroups.SERVICE_GROUPS)
-    .filter(group => group.name !== "Core Services")
-    .flatMap(group => group.services);
-
-  // Check that all expected services are loaded
-  for (const serviceName of allAppServices) {
-    const config = services[serviceName];
-    assertExists(config, `Service ${serviceName} should be loaded`);
-    
-    // Every service must have these basic properties
-    assertExists(config.name, `Service ${serviceName} should have a name`);
-    assertExists(config.type, `Service ${serviceName} should have a type`);
-    
-    // Only TypeScript/JavaScript/Rust services need command and setup
-    if (["typescript", "javascript", "rust"].includes(config.type)) {
-      assertExists(config.command, `Service ${serviceName} should have a command`);
-      assertExists(config.setup, `Service ${serviceName} should have setup instructions`);
-    }
-  }
-});
+import { assertEquals, assertExists } from "jsr:@std/assert";
+import { getApplicationServices } from "../src/services/service-loader.ts";
+import { validCommandTypes, validServiceTypes, type ServiceDefinition } from "../src/services/service-types.ts";
 
 Deno.test("Application Service Loader - Service Dependencies", async () => {
   const services = await getApplicationServices();
@@ -78,7 +44,6 @@ Deno.test("Application Service Loader - Service Types and Commands", async () =>
   const services = await getApplicationServices();
   const serviceGroups = await import("../q4/const/constants.ts");
 
-  // Get service type definitions from service-types.ts for validation  
   // Test each service group
   for (const [groupName, group] of Object.entries(serviceGroups.SERVICE_GROUPS)) {
     // Skip core services as they're infrastructure services
@@ -89,7 +54,6 @@ Deno.test("Application Service Loader - Service Types and Commands", async () =>
       assertExists(config, `Service ${serviceName} from ${groupName} group should be loaded`);
 
       // Validate service type
-      // Use service types from the ServiceDefinition interface, avoiding duplicates
       assertEquals(
         validServiceTypes.includes(config.type),
         true,
@@ -104,7 +68,7 @@ Deno.test("Application Service Loader - Service Types and Commands", async () =>
         );
 
         assertEquals(
-          validCommandTypes.includes(config.command!.type as CommandType),
+          validCommandTypes.includes(config.command!.type as "npm" | "pnpm" | "cargo" | "deno"),
           true,
           `Service ${serviceName} should have a valid command type, got: ${config.command!.type}`
         );

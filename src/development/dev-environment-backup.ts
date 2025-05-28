@@ -1,22 +1,62 @@
-import { Logger } from "./logger.ts";
-import inquirer from "inquirer";
-import { ClusterManager } from "./cluster-manager.ts";
-import { ServiceManager } from "./service-manager.ts";
-import { ConfigManager } from "./config-manager.ts";
-import { SERVICE_GROUPS, DEVELOPMENT_PROFILES, QUARK_REPOS } from "../q4/const/constants.ts";
-import type { VSCodeWorkspace, ClusterConfig } from "./types.ts";
-import { execSync } from "node:child_process";
-import { exists } from "@std/fs";
+/**
+ * @fileoverview Legacy development environment class with modular architecture.
+ * 
+ * This class has been refactored to use the new modular architecture while maintaining
+ * backward compatibility. New development should use the individual modules directly
+ * for better separation of concerns and testability.
+ * 
+ * @example
+ * ```typescript
+ * import { DevEnvironment } from './dev-environment.ts';
+ * 
+ * const devEnv = new DevEnvironment();
+ * await devEnv.setup();
+ * ```
+ * 
+ * @deprecated Consider using individual modules from './modules/' for new development
+ * @author Development Environment Team
+ * @since 1.0.0
+ */
 
+import { EnvironmentInitializer } from "./modules/environment-initializer.ts";
+
+/**
+ * Legacy development environment management class.
+ * 
+ * This class provides backward compatibility with existing code while delegating
+ * operations to the new modular architecture. For new development, consider using
+ * the individual modules directly for better separation of concerns.
+ * 
+ * @example
+ * ```typescript
+ * const devEnv = new DevEnvironment();
+ * 
+ * // Complete environment setup
+ * await devEnv.setup();
+ * 
+ * // Service selection
+ * const services = await devEnv.selectServices();
+ * 
+ * // Cleanup
+ * await devEnv.cleanup();
+ * ```
+ * 
+ * @deprecated Use individual modules from './modules/' for new development
+ */
 export class DevEnvironment {
-  private serviceManager: ServiceManager;
-  private clusterManager: ClusterManager;
-  private configManager: ConfigManager;
+  /** Environment initializer that orchestrates all operations */
+  private readonly environmentInitializer: EnvironmentInitializer;
 
+  /**
+   * Creates a new DevEnvironment instance.
+   * 
+   * @example
+   * ```typescript
+   * const devEnv = new DevEnvironment();
+   * ```
+   */
   constructor() {
-    this.serviceManager = ServiceManager.getInstance();
-    this.clusterManager = ClusterManager.getInstance();
-    this.configManager = ConfigManager.getInstance();
+    this.environmentInitializer = new EnvironmentInitializer();
   }
 
   private async selectClusterType(): Promise<ClusterConfig> {

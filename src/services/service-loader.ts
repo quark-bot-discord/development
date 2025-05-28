@@ -27,7 +27,7 @@ export async function getApplicationServices(): Promise<Record<string, ServiceDe
       }
       
       const serviceName = dirEntry.name.replace('.ts', '');
-      const configPath = `../q4/${dirEntry.name}`;
+      const configPath = `../../q4/${dirEntry.name}`;
       
       try {
         const module = await import(configPath);
