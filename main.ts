@@ -59,7 +59,10 @@ function getServiceNamespace(service: string): string {
 }
 
 // Helper function to convert ServiceDefinition command to script
-function commandToScript(command: { type: string; run: string[] }): string {
+function commandToScript(command: { type: string; run: string[] }): string | undefined {
+  if (!command || !command.type || !command.run || command.run.length === 0) {
+    return undefined;
+  }
   return `${command.type} ${command.run.join(' ')}`;
 }
 
@@ -158,8 +161,7 @@ Commands:
               name: "selectedServices",
               message: "Select services to add:",
               choices,
-              pageSize: 20,
-              loop: false,
+              loop: true,
               validate: (input) => {
                 if (input.length === 0) {
                   return "Please select at least one service";
@@ -215,7 +217,7 @@ Commands:
         } else {
           // Interactive selection mode
           if (localServices.length === 0) {
-            Logger.error("No local services configured");
+            Logger.info("No local services configured");
             Deno.exit(1);
           }
 
@@ -229,8 +231,7 @@ Commands:
                 value: service,
                 short: service,
               })),
-              pageSize: 20,
-              loop: false,
+              loop: true,
               validate: (input) => {
                 if (input.length === 0) {
                   return "Please select at least one service";
