@@ -35,6 +35,9 @@ quark remove
 # Start configured local services
 quark start
 
+# Show service environment variables
+quark env [service-name]
+
 # Update submodules to latest versions
 quark update-submodules
 
@@ -47,6 +50,7 @@ quark cleanup
 # Non-interactive mode
 quark add service-name
 quark remove service-name
+quark env service-name
 ```
 
 The `quark` command is automatically available in the dev container. All dependencies and tools are pre-installed and configured for you.

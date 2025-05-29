@@ -86,6 +86,7 @@ Commands:
   add    [service]      Add local services (interactive if no service specified)
   remove [service]      Remove local services (interactive if no service specified)
   start                 Start all configured local services
+  env    [service]      Display environment variables for a service
   cleanup               Clean up development environment
   list-services         List all available services (used for shell completion)
   update-submodules     Update all submodules to their latest versions
@@ -253,6 +254,37 @@ Commands:
         await config.load();
         const localServices = config.getLocalServices();
         await ServiceRunner.getInstance().startAllServices(localServices);
+        break;
+      }
+      case "env": {
+        await config.load();
+        const localServices = config.getLocalServices();
+        
+        // If a service name was provided as an argument, show just that one
+        const serviceName = args._.length > 1 ? String(args._[1]) : null;
+        
+        if (serviceName) {
+          if (localServices[serviceName]) {
+            await ServiceRunner.getInstance().printServiceEnv(serviceName, localServices[serviceName]);
+          } else {
+            Logger.error(`Service '${serviceName}' is not configured locally. Use 'quark add' to add it.`);
+          }
+        } else {
+          // No service specified, allow user to select interactively
+          if (Object.keys(localServices).length === 0) {
+            Logger.error("No local services configured. Use 'quark add' to add services.");
+            Deno.exit(1);
+          }
+          
+          const { service } = await inquirer.prompt([{
+            type: 'list',
+            name: 'service',
+            message: 'Select a service to show environment variables:',
+            choices: Object.keys(localServices).sort(),
+          }]);
+          
+          await ServiceRunner.getInstance().printServiceEnv(service, localServices[service]);
+        }
         break;
       }
       case "list-services": {
