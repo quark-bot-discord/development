@@ -1,5 +1,4 @@
 import type { ServiceDefinition } from './service-types.ts';
-import { join } from "@std/path";
 
 // Cache for loaded configurations
 let configCache: Record<string, ServiceDefinition> | null = null;
@@ -11,7 +10,7 @@ export async function getApplicationServices(): Promise<Record<string, ServiceDe
   }
 
   const configs: Record<string, ServiceDefinition> = {};
-  const q4Dir = join(Deno.cwd(), 'q4');
+  const q4Dir = '/workspace/q4';
   
   try {
     // Read all files in the q4 directory
@@ -27,10 +26,10 @@ export async function getApplicationServices(): Promise<Record<string, ServiceDe
       }
       
       const serviceName = dirEntry.name.replace('.ts', '');
-      const configPath = `../../q4/${dirEntry.name}`;
+      const configPath = `/workspace/q4/${dirEntry.name}`;
       
       try {
-        const module = await import(configPath);
+        const module = await import(`file://${configPath}`);
         
         // Look for any export that looks like a service config
         // First try the conventional naming pattern (serviceNameConfig)

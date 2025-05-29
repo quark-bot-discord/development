@@ -1,5 +1,4 @@
 import type { InfraServiceConfig } from './service-types.ts';
-import { join } from "@std/path";
 
 // Cache for loaded infrastructure configurations
 let infraConfigCache: Record<string, InfraServiceConfig> | null = null;
@@ -11,7 +10,7 @@ export async function getInfrastructureServices(): Promise<Record<string, InfraS
   }
 
   const configs: Record<string, InfraServiceConfig> = {};
-  const infraDir = join(Deno.cwd(), 'q4', 'infra');
+  const infraDir = '/workspace/q4/infra';
   
   try {
     // Read all files in the q4/infra directory
@@ -27,7 +26,7 @@ export async function getInfrastructureServices(): Promise<Record<string, InfraS
       }
       
       const serviceName = dirEntry.name.replace('.ts', '');
-      const configPath = join(Deno.cwd(), 'q4', 'infra', dirEntry.name);
+      const configPath = `/workspace/q4/infra/${dirEntry.name}`;
       
       try {
         const module = await import(`file://${configPath}`);

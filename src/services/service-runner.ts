@@ -18,7 +18,6 @@ export class ServiceRunner {
   private getServiceCommand(service: string, appConfig: ServiceDefinition, serviceConfig: LocalServiceConfig): Deno.Command {
     const { command } = appConfig;
     const cwd = `/workspace/repos/${service}`;
-
     if (!command) {
       throw new Error(`No command specified for service: ${service}`);
     }
@@ -102,6 +101,7 @@ export class ServiceRunner {
     
     try {
       // Run setup commands before starting the service
+      if (appConfig.type === "static") return;
       await this.runSetupCommands(service, appConfig);
 
       const process = this.getServiceCommand(service, appConfig, serviceConfig);

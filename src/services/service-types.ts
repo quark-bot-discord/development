@@ -7,6 +7,7 @@ export const validServiceTypes = [
   "rust",
   "container",
   "job",
+  "static"
 ] as const;
 
 export const validCommandTypes = [
@@ -14,6 +15,7 @@ export const validCommandTypes = [
   "pnpm",
   "cargo",
   "deno",
+  "bash",
 ] as const;
 
 export interface ServiceDefinition {
