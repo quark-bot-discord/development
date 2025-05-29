@@ -2,12 +2,12 @@
 
 import { parseArgs } from "@std/cli";
 import inquirer from "inquirer";
-import { DevEnvironment } from "./src/development/dev-environment.ts";
 import { ConfigManager } from "./src/core/config-manager.ts";
 import { SERVICE_GROUPS } from "./q4/const/constants.ts";
 import { Logger } from "./src/development/logger.ts";
 import { getApplicationServices } from "./src/services/service-loader.ts";
 import { ServiceRunner } from "./src/services/service-runner.ts";
+import { EnvironmentInitializer } from "./src/index.ts";
 
 // Helper function to get all available services
 function getAllServices(): string[] {
@@ -63,7 +63,6 @@ function commandToScript(command: { type: string; run: string[] }): string {
   return `${command.type} ${command.run.join(' ')}`;
 }
 
-const devEnv = new DevEnvironment();
 const config = ConfigManager.getInstance();
 
 const args = parseArgs(Deno.args, {
@@ -101,7 +100,7 @@ Commands:
   try {
     switch (command) {
       case "setup": {
-        await devEnv.setup();
+        await new EnvironmentInitializer().setup();
         break;
       }
 
@@ -293,7 +292,7 @@ Commands:
         break;
       }
       case "cleanup": {
-        await devEnv.cleanup();
+        await new EnvironmentInitializer().cleanup();
         break;
       }
       case "update-submodules": {
@@ -303,7 +302,7 @@ Commands:
           message: 'Automatically commit and push submodule updates?',
           default: true,
         }]);
-        await devEnv.updateSubmodules(autoCommit);
+        await new EnvironmentInitializer().updateSubmodules(autoCommit);
         break;
       }
       case "git": {
