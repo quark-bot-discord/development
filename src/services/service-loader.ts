@@ -67,18 +67,7 @@ export async function getApplicationServices(): Promise<Record<string, ServiceDe
   return configs;
 }
 
-// Synchronous version for backward compatibility (loads from cache or throws)
-export function getApplicationServicesSync(): Record<string, ServiceDefinition> {
-  if (!configCache) {
-    throw new Error('Service configurations not loaded. Call getApplicationServices() first.');
-  }
-  return configCache;
-}
-
 // Clear the cache to force reload on next call
 export function clearServiceCache(): void {
   configCache = null;
 }
-
-// Legacy export for backward compatibility - initialize asynchronously
-export const applicationServices: Promise<Record<string, ServiceDefinition>> = getApplicationServices();

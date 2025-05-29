@@ -8,7 +8,7 @@
  */
 
 // Service-related modules
-export { getApplicationServices, getApplicationServicesSync, clearServiceCache } from './service-loader.ts';
-export { getInfrastructureServices, getInfrastructureServicesSync, clearInfraServiceCache } from './infra-service-loader.ts';
+export { getApplicationServices, clearServiceCache } from './service-loader.ts';
+export { getInfrastructureServices } from './infra-service-loader.ts';
 export { ServiceRunner } from './service-runner.ts';
 export * from './service-types.ts';

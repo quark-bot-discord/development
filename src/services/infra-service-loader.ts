@@ -67,18 +67,7 @@ export async function getInfrastructureServices(): Promise<Record<string, InfraS
   return configs;
 }
 
-// Synchronous version for backward compatibility (loads from cache or throws)
-export function getInfrastructureServicesSync(): Record<string, InfraServiceConfig> {
-  if (!infraConfigCache) {
-    throw new Error('Infrastructure service configurations not loaded. Call getInfrastructureServices() first.');
-  }
-  return infraConfigCache;
-}
-
 // Clear the cache to force reload on next call
 export function clearInfraServiceCache(): void {
   infraConfigCache = null;
 }
-
-// Legacy export for backward compatibility - initialize asynchronously
-export const infrastructureServices: Promise<Record<string, InfraServiceConfig>> = getInfrastructureServices();

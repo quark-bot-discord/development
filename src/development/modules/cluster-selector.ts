@@ -14,8 +14,8 @@
  * await clusterSelector.setupCluster(services);
  * ```
  * 
- * @author Development Environment Team
- * @since 2.0.0
+ * @author veryCrunchy
+ * @since 1.0.0
  */
 
 import inquirer from "inquirer";

@@ -14,8 +14,8 @@
  * await workspaceManager.setupRepositories(services);
  * ```
  * 
- * @author Development Environment Team
- * @since 2.0.0
+ * @author veryCrunchy
+ * @since 1.0.0
  */
 
 import { Logger } from "../logger.ts";

@@ -4,8 +4,8 @@
  * This module provides a centralized export point for all development environment
  * management modules, making it easy to import and use the modular components.
  * 
- * @author Development Environment Team
- * @since 2.0.0
+ * @author veryCrunchy
+ * @since 1.0.0
  */
 
 export { ClusterSelector } from './cluster-selector.ts';

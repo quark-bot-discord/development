@@ -7,5 +7,5 @@
  */
 
 // Development environment modules
-export { DevEnvironment } from './dev-environment.ts';
+export * from './modules/index.ts';
 export { Logger } from './logger.ts';
