@@ -7,7 +7,7 @@ import type { LocalServiceConfig, ServiceConfig } from "../types/types.ts";
 export class ConfigManager {
   private static instance: ConfigManager;
   private config: ServiceConfig;
-  private static readonly CONFIG_FILE = "quark-dev-config.json";
+  private static readonly CONFIG_FILE = "/workspace/quark-dev-config.json";
 
   private constructor() {
     this.config = {
