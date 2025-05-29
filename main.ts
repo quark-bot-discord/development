@@ -91,8 +91,9 @@ Commands:
   list-services         List all available services (used for shell completion)
   update-submodules     Update all submodules to their latest versions
   git                   Display Git aliases and usage help
+  sign                  Clear GPG key to free it for use in VS Code commits
 `);
-  self.close();
+  Deno.exit(0);
 }
 
 // Main command handling
@@ -313,6 +314,27 @@ Commands:
           Logger.info(helpText);
         } catch (_error) {
           Logger.error("Git help file not found. Make sure to run the git setup script in your dev container.");
+        }
+        break;
+      }
+      
+      case "sign": {
+        Logger.info("Clearing GPG key to free it for use...");
+        
+        try {
+          // Clear sign the GPG key to free it
+          const clearSignCmd = new Deno.Command('gpg', {
+            args: ['--clearsign', '--output', '/dev/null', '/dev/null'],
+            stdout: 'inherit',
+            stderr: 'inherit',
+          });
+          await clearSignCmd.output();
+          
+          Logger.success("GPG key cleared successfully!");          
+        } catch (error) {
+          Logger.error(`Failed to clear GPG key: ${error instanceof Error ? error.message : String(error)}`);
+          Logger.info("Make sure GPG is installed and configured properly.");
+          Deno.exit(1);
         }
         break;
       }
