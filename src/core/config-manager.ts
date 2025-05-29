@@ -1,6 +1,7 @@
 
 import { exists } from "@std/fs";
 import { Logger } from "../development/logger.ts";
+import { WorkspaceManager } from "../development/modules/workspace-manager.ts";
 import type { LocalServiceConfig, ServiceConfig } from "../types/types.ts";
 
 export class ConfigManager {
@@ -79,7 +80,7 @@ export class ConfigManager {
 
     return (
       typeof repoPath === "string" &&
-      typeof script === "string" &&
+      (script === undefined || typeof script === "string") &&
       typeof env === "object" &&
       env !== null &&
       (namespace === undefined || typeof namespace === "string")
@@ -107,9 +108,27 @@ export class ConfigManager {
       throw new Error(`Invalid configuration for service: ${service}`);
     }
 
-    // Ensure repo path exists
+    // Ensure repo path exists, create it if it doesn't
     if (!(await exists(config.repoPath))) {
-      throw new Error(`Repository path does not exist: ${config.repoPath}`);
+      Logger.info(`Repository path does not exist: ${config.repoPath}`);
+      Logger.info(`Attempting to create repository using workspace manager...`);
+      
+      try {
+        const workspaceManager = new WorkspaceManager();
+        // Extract service name from repo path if it matches expected pattern
+        const repoPathParts = config.repoPath.split('/');
+        const serviceName = repoPathParts[repoPathParts.length - 1];
+        
+        if (workspaceManager.hasRepository(serviceName)) {
+          await workspaceManager.setupRepositories([serviceName]);
+          Logger.success(`Successfully created repository for service: ${serviceName}`);
+        } else {
+          throw new Error(`No repository mapping found for service: ${serviceName}`);
+        }
+      } catch (error) {
+        Logger.error(`Failed to create repository: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(`Repository path does not exist and could not be created: ${config.repoPath}`);
+      }
     }
 
     this.config.localServices[service] = config;

@@ -109,7 +109,7 @@ export interface KubernetesConfig {
 
 export interface LocalServiceConfig {
   repoPath: string;
-  script: string;
+  script?: string;
   env: Record<string, string>;
   namespace?: string;
 }
