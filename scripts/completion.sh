@@ -2,7 +2,7 @@
 
 # Get all available services from service definitions
 _get_available_services() {
-    echo "$(quark list-services)"
+    echo $(quark list-services)
 }
 
 # Get configured local services
