@@ -29,7 +29,7 @@ export async function getApplicationServices(): Promise<Record<string, ServiceDe
       const configPath = `/workspace/q4/${dirEntry.name}`;
       
       try {
-        const config = await import(`file://${configPath}`);
+        const config = (await import(`file://${configPath}`)).default;
                
         // Validate that it looks like a ServiceDefinition
         if (config && typeof config === 'object' && config.name && config.type) {
