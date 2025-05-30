@@ -355,7 +355,7 @@ export class EnvironmentInitializer {
     Logger.info("Performing dry run of environment setup...");
     
     const services = await this.profileManager.selectServices();
-    const repositories = this.workspaceManager.filterServicesWithRepositories(services);
+    const repositories = await this.workspaceManager.filterServicesWithRepositories(services);
     
     // Note: This is a simplified dry run - in a full implementation,
     // you might want to also simulate cluster selection
@@ -404,7 +404,7 @@ export class EnvironmentInitializer {
     // Check for common repositories
     const commonServices = ['frontend', 'api-gateway'];
     for (const service of commonServices) {
-      if (this.workspaceManager.hasRepository(service)) {
+      if (await this.workspaceManager.hasRepository(service)) {
         const isCloned = await this.workspaceManager.isRepositoryCloned(service);
         if (!isCloned) {
           issues.push(`Repository for ${service} not cloned`);

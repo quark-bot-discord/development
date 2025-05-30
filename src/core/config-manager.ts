@@ -3,6 +3,7 @@ import { exists } from "@std/fs";
 import { Logger } from "../development/logger.ts";
 import { WorkspaceManager } from "../development/modules/workspace-manager.ts";
 import type { LocalServiceConfig, ServiceConfig } from "../types/types.ts";
+import { getLocalServices } from "../utils/cli-helpers.ts";
 
 export class ConfigManager {
   private static instance: ConfigManager;
@@ -98,6 +99,7 @@ export class ConfigManager {
         `Failed to save config: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+    new WorkspaceManager().createVSCodeWorkspace(getLocalServices());
   }
 
   async addLocalService(
@@ -119,7 +121,7 @@ export class ConfigManager {
         const repoPathParts = config.repoPath.split('/');
         const serviceName = repoPathParts[repoPathParts.length - 1];
         
-        if (workspaceManager.hasRepository(serviceName)) {
+        if (await workspaceManager.hasRepository(serviceName)) {
           await workspaceManager.setupRepositories([serviceName]);
           Logger.success(`Successfully created repository for service: ${serviceName}`);
         } else {
@@ -193,3 +195,4 @@ export class ConfigManager {
     return this.config.localServices[service];
   }
 }
+

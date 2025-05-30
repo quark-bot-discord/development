@@ -19,9 +19,8 @@
  */
 
 import { Logger } from "../logger.ts";
-import { ServiceManager } from "../../core/service-manager.ts";
 import { ConfigManager } from "../../core/config-manager.ts";
-import { SERVICE_GROUPS, QUARK_REPOS } from "../../../q4/const/constants.ts";
+import { ServiceRepoResolver } from "./service-repo-resolver.ts";
 import type { VSCodeWorkspace } from "../../types/types.ts";
 import { execSync } from "node:child_process";
 import { exists } from "@std/fs";
@@ -48,11 +47,11 @@ import { exists } from "@std/fs";
  * ```
  */
 export class WorkspaceManager {
-  /** Service manager instance for dependency resolution */
-  private readonly serviceManager: ServiceManager;
-  
   /** Configuration manager instance for tracking cloned repositories */
   private readonly configManager: ConfigManager;
+  
+  /** Service repository resolver for dynamic repository mapping */
+  private readonly serviceRepoResolver: ServiceRepoResolver;
 
   /**
    * Creates a new WorkspaceManager instance.
@@ -63,8 +62,8 @@ export class WorkspaceManager {
    * ```
    */
   constructor() {
-    this.serviceManager = ServiceManager.getInstance();
     this.configManager = ConfigManager.getInstance();
+    this.serviceRepoResolver = new ServiceRepoResolver();
   }
 
   /**
@@ -101,22 +100,10 @@ export class WorkspaceManager {
    * @throws {Error} When dependency resolution fails
    */
   async setupRepositories(services: string[]): Promise<void> {
-    const allDeps = new Set<string>();
+    Logger.step(1, 2, "Setting up repositories...");
 
-    Logger.step(1, 3, "Resolving service dependencies...");
-    for (const service of services) {
-      const deps = await this.serviceManager.getServiceDependenciesFromDefinitions(service);
-      deps.forEach((dep) => allDeps.add(dep));
-    }
-
-    Logger.step(2, 3, "Setting up repositories...");
-    const servicesWithDeps = [...new Set([...services, ...allDeps])];
-    const servicesWithRepos = servicesWithDeps.filter(service => 
-      service in QUARK_REPOS && 
-      !service.startsWith('configmap:') && 
-      !service.startsWith('secret:') && 
-      !service.startsWith('pvc:')
-    );
+    // Filter to only services that have repositories
+    const servicesWithRepos = await this.serviceRepoResolver.filterServicesWithRepositories(services);
 
     for (const service of servicesWithRepos) {
       try {
@@ -128,7 +115,7 @@ export class WorkspaceManager {
       }
     }
 
-    Logger.step(3, 3, "Repository setup complete");
+    Logger.step(2, 2, "Repository setup complete");
   }
 
   /**
@@ -158,14 +145,8 @@ export class WorkspaceManager {
    * @throws {Error} When workspace file creation fails
    */
   async createVSCodeWorkspace(services: string[]): Promise<void> {
-    // Filter out infrastructure services and Kubernetes resources
-    const appServices = services.filter(service => {
-      const isInfraService = SERVICE_GROUPS.core.services.includes(service);
-      const isKubeResource = service.startsWith('configmap:') || 
-                           service.startsWith('secret:') || 
-                           service.startsWith('pvc:');
-      return !isInfraService && !isKubeResource;
-    });
+    // Filter out infrastructure services and get only services with repositories
+    const servicesWithRepos = await this.serviceRepoResolver.filterServicesWithRepositories(services);
 
     const workspace: VSCodeWorkspace = {
       folders: [
@@ -173,7 +154,7 @@ export class WorkspaceManager {
           name: "q4",
           path: "/workspace/q4"
         },
-        ...appServices.map((service) => ({
+        ...servicesWithRepos.map((service: string) => ({
           name: service,
           path: `/workspace/repos/${service}`,
         }))
@@ -241,10 +222,11 @@ export class WorkspaceManager {
    */
   private async cloneServiceRepo(service: string): Promise<void> {
     const repoPath = `/workspace/repos/${service}`;
-
+    
     try {
-      if (!(service in QUARK_REPOS)) {
-        throw new Error(`No repository mapping found for service: ${service}`);
+      // Check if service has repository using the resolver
+      if (!(await this.serviceRepoResolver.hasRepository(service))) {
+        throw new Error(`No repository configuration found for service: ${service}`);
       }
 
       // Skip if repo already exists
@@ -253,8 +235,7 @@ export class WorkspaceManager {
         return;
       }
 
-      const repoName = QUARK_REPOS[service as keyof typeof QUARK_REPOS];
-      const repoUrl = `https://github.com/quark-bot-discord/${repoName}.git`;
+      const repoUrl = await this.serviceRepoResolver.getRepositoryUrl(service);
       Logger.info(`Cloning ${service} from ${repoUrl}`)
 
       execSync(`git clone ${repoUrl} ${repoPath}`, {
@@ -276,58 +257,53 @@ export class WorkspaceManager {
   /**
    * Gets the list of services that have repository mappings.
    * 
-   * @returns An array of service names that have repositories available
+   * @returns A promise that resolves to an array of service names that have repositories available
    * 
    * @example
    * ```typescript
-   * const availableServices = manager.getServicesWithRepositories();
+   * const availableServices = await manager.getServicesWithRepositories();
    * console.log('Services with repos:', availableServices);
    * ```
    */
-  getServicesWithRepositories(): string[] {
-    return Object.keys(QUARK_REPOS);
+  async getServicesWithRepositories(): Promise<string[]> {
+    return await this.serviceRepoResolver.getServicesWithRepositories();
   }
 
   /**
    * Checks if a service has a repository mapping.
    * 
    * @param service - The service name to check
-   * @returns True if the service has a repository mapping
+   * @returns A promise that resolves to true if the service has a repository mapping
    * 
    * @example
    * ```typescript
-   * const hasRepo = manager.hasRepository('frontend');
+   * const hasRepo = await manager.hasRepository('frontend');
    * if (hasRepo) {
    *   console.log('Frontend service has a repository');
    * }
    * ```
    */
-  hasRepository(service: string): boolean {
-    return service in QUARK_REPOS;
+  async hasRepository(service: string): Promise<boolean> {
+    return await this.serviceRepoResolver.hasRepository(service);
   }
 
   /**
    * Gets the repository URL for a service.
    * 
    * @param service - The service name
-   * @returns The GitHub repository URL for the service
+   * @returns A promise that resolves to the GitHub repository URL for the service
    * 
    * @example
    * ```typescript
-   * const url = manager.getRepositoryUrl('frontend');
+   * const url = await manager.getRepositoryUrl('frontend');
    * console.log('Frontend repo:', url);
    * // Output: https://github.com/quark-bot-discord/quark-frontend.git
    * ```
    * 
    * @throws {Error} When the service has no repository mapping
    */
-  getRepositoryUrl(service: string): string {
-    if (!(service in QUARK_REPOS)) {
-      throw new Error(`No repository mapping found for service: ${service}`);
-    }
-    
-    const repoName = QUARK_REPOS[service as keyof typeof QUARK_REPOS];
-    return `https://github.com/quark-bot-discord/${repoName}.git`;
+  async getRepositoryUrl(service: string): Promise<string> {
+    return await this.serviceRepoResolver.getRepositoryUrl(service);
   }
 
   /**
@@ -344,7 +320,7 @@ export class WorkspaceManager {
    * ```
    */
   getRepositoryPath(service: string): string {
-    return `/workspace/repos/${service}`;
+    return this.serviceRepoResolver.getRepositoryPath(service);
   }
 
   /**
@@ -370,22 +346,17 @@ export class WorkspaceManager {
    * Filters services to only include those with repositories and excludes Kubernetes resources.
    * 
    * @param services - Array of service names to filter
-   * @returns Array of services that have repositories and are not Kubernetes resources
+   * @returns A promise that resolves to an array of services that have repositories and are not Kubernetes resources
    * 
    * @example
    * ```typescript
    * const allServices = ['frontend', 'api', 'configmap:app-config', 'secret:auth'];
-   * const repoServices = manager.filterServicesWithRepositories(allServices);
+   * const repoServices = await manager.filterServicesWithRepositories(allServices);
    * console.log(repoServices); // ['frontend', 'api']
    * ```
    */
-  filterServicesWithRepositories(services: string[]): string[] {
-    return services.filter(service => 
-      service in QUARK_REPOS && 
-      !service.startsWith('configmap:') && 
-      !service.startsWith('secret:') && 
-      !service.startsWith('pvc:')
-    );
+  async filterServicesWithRepositories(services: string[]): Promise<string[]> {
+    return await this.serviceRepoResolver.filterServicesWithRepositories(services);
   }
 
   /**
