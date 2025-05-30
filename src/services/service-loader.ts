@@ -29,29 +29,13 @@ export async function getApplicationServices(): Promise<Record<string, ServiceDe
       const configPath = `/workspace/q4/${dirEntry.name}`;
       
       try {
-        const module = await import(`file://${configPath}`);
-        
-        // Look for any export that looks like a service config
-        // First try the conventional naming pattern (serviceNameConfig)
-        const expectedConfigName = serviceName.replace(/-/g, '') + 'Config';
-        let configExport = module[expectedConfigName];
-        
-        // If not found, look for any export ending with 'Config'
-        if (!configExport) {
-          const configKey = Object.keys(module).find(key => key.endsWith('Config'));
-          configExport = configKey ? module[configKey] : null;
-        }
-        
-        // If still not found, look for default export
-        if (!configExport && module.default) {
-          configExport = module.default;
-        }
-        
+        const config = await import(`file://${configPath}`);
+               
         // Validate that it looks like a ServiceDefinition
-        if (configExport && typeof configExport === 'object' && configExport.name && configExport.type) {
-          configs[serviceName] = configExport as ServiceDefinition;
+        if (config && typeof config === 'object' && config.name && config.type) {
+          configs[serviceName] = config as ServiceDefinition;
         } else {
-          console.warn(`Skipping ${dirEntry.name}: No valid ServiceDefinition found`);
+          console.warn(`Skipping ${dirEntry.name}: Not a valid ServiceDefinition`);
         }
         
       } catch (error) {
