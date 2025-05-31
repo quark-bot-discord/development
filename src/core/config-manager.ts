@@ -1,12 +1,14 @@
 
 import { exists } from "@std/fs";
-import { Logger } from "./logger.ts";
-import type { LocalServiceConfig, ServiceConfig } from "./types.ts";
+import { Logger } from "../development/logger.ts";
+import { WorkspaceManager } from "../development/modules/workspace-manager.ts";
+import type { LocalServiceConfig, ServiceConfig } from "../types/types.ts";
+import { getLocalServices } from "../utils/cli-helpers.ts";
 
 export class ConfigManager {
   private static instance: ConfigManager;
   private config: ServiceConfig;
-  private static readonly CONFIG_FILE = "quark-dev-config.json";
+  private static readonly CONFIG_FILE = "/workspace/quark-dev-config.json";
 
   private constructor() {
     this.config = {
@@ -79,7 +81,7 @@ export class ConfigManager {
 
     return (
       typeof repoPath === "string" &&
-      typeof script === "string" &&
+      (script === undefined || typeof script === "string") &&
       typeof env === "object" &&
       env !== null &&
       (namespace === undefined || typeof namespace === "string")
@@ -97,6 +99,7 @@ export class ConfigManager {
         `Failed to save config: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+    new WorkspaceManager().createVSCodeWorkspace(getLocalServices());
   }
 
   async addLocalService(
@@ -107,9 +110,27 @@ export class ConfigManager {
       throw new Error(`Invalid configuration for service: ${service}`);
     }
 
-    // Ensure repo path exists
+    // Ensure repo path exists, create it if it doesn't
     if (!(await exists(config.repoPath))) {
-      throw new Error(`Repository path does not exist: ${config.repoPath}`);
+      Logger.info(`Repository path does not exist: ${config.repoPath}`);
+      Logger.info(`Attempting to create repository using workspace manager...`);
+      
+      try {
+        const workspaceManager = new WorkspaceManager();
+        // Extract service name from repo path if it matches expected pattern
+        const repoPathParts = config.repoPath.split('/');
+        const serviceName = repoPathParts[repoPathParts.length - 1];
+        
+        if (await workspaceManager.hasRepository(serviceName)) {
+          await workspaceManager.setupRepositories([serviceName]);
+          Logger.success(`Successfully created repository for service: ${serviceName}`);
+        } else {
+          throw new Error(`No repository mapping found for service: ${serviceName}`);
+        }
+      } catch (error) {
+        Logger.error(`Failed to create repository: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(`Repository path does not exist and could not be created: ${config.repoPath}`);
+      }
     }
 
     this.config.localServices[service] = config;
@@ -174,3 +195,4 @@ export class ConfigManager {
     return this.config.localServices[service];
   }
 }
+

@@ -109,7 +109,7 @@ export interface KubernetesConfig {
 
 export interface LocalServiceConfig {
   repoPath: string;
-  script: string;
+  script?: string;
   env: Record<string, string>;
   namespace?: string;
 }
@@ -123,8 +123,20 @@ export interface ServiceConfig {
 export interface K3dCluster {
   name: string;
   serversRunning: number;
+  serversCount?: number;
+  agentsRunning?: number;
+  agentsCount?: number;
   token: string;
-  servers: Array<{
+  nodes?: Array<{
+    name: string;
+    role: string;
+    State?: {
+      Running?: boolean;
+      Status?: string;
+      Started?: string;
+    };
+  }>;
+  servers?: Array<{
     name: string;
     role: string;
     state: string;

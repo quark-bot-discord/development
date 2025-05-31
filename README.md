@@ -35,18 +35,59 @@ quark remove
 # Start configured local services
 quark start
 
-# Update submodules to latest versions
-quark update-submodules
-
-# Show git aliases and help
-quark git
+# Show service environment variables
+quark env [service-name]
 
 # Clean up development environment
 quark cleanup
 
 # Non-interactive mode
 quark add service-name
+```
+
+### Module Commands
+
+Instead of running the full `setup` command, you can run individual modules separately. This is useful when you want to:
+
+- Only update repositories without reconfiguring the cluster
+- Apply new service configurations without re-cloning repos
+- Update the workspace configuration after adding new services
+- Selectively run parts of the setup process
+
+```bash
+# Fetch/clone repositories for selected services
+quark repos
+
+# Setup Kubernetes cluster configuration
+quark cluster
+
+# Update service configurations and manifests
+quark configs
+
+# Create/update VS Code workspace configuration
+quark workspace
+
+# Update all submodules to their latest versions
+quark submodules
+```
+
+### Utility Commands
+
+```bash
+# Validate current environment configuration
+quark check
+
+# Show git aliases and help
+quark git
+
+# Clear GPG key to free it for use in VS Code commits
+quark sign
+```
+
+```bash
+quark add service-name
 quark remove service-name
+quark env service-name
 ```
 
 The `quark` command is automatically available in the dev container. All dependencies and tools are pre-installed and configured for you.
@@ -144,7 +185,7 @@ quark remove
 quark start
 
 # Update submodules to latest versions
-quark update-submodules
+quark submodules
 
 # Clean up the development environment
 quark cleanup

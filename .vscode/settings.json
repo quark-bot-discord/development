@@ -1,3 +1,7 @@
 {
-    "deno.enable": true
+  "deno.enable": true,
+  "deno.lint": true,
+  "deno.unstable": true,
+  "deno.test.enable": true,
+  "deno.test.autoRun": true
 }

@@ -1,7 +1,3 @@
-[submodule "quark-k8s"]
-	path = quark-k8s
-	url = git@github.com:quark-bot-discord/quark-k8s.git
-	branch = main
 [submodule "q4"]
 	path = q4
 	url = git@github.com:quark-bot-discord/q4.git

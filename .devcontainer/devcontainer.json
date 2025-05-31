@@ -27,8 +27,7 @@
     "source=${localWorkspaceFolder}/src,target=/workspace/src,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/scripts,target=/workspace/scripts,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/main.ts,target=/workspace/main.ts,type=bind,consistency=cached",
-    "source=${localWorkspaceFolder}/deno.json,target=/workspace/deno.json,type=bind,consistency=cached",
-    "source=${localWorkspaceFolder}/quark-k8s,target=/workspace/quark-k8s,type=bind,consistency=cached"
+    "source=${localWorkspaceFolder}/deno.json,target=/workspace/deno.json,type=bind,consistency=cached"
   ],
   "remoteEnv": {
     "KUBECONFIG": "/workspace/kube/kubeconfig-quark-dev.yaml",
@@ -41,7 +40,7 @@
     },
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
       "version": "1.28",
-      "helm": "latest",
+      "helm": "3.18.0",
       "minikube": "none"
     },
     "ghcr.io/devcontainers/features/common-utils:2": {
@@ -82,7 +81,6 @@
           "scripts": false,
           "main.ts": false,
           "deno.*": false,
-          "quark-k8s": false,
           ".*": false
         }
       }
