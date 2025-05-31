@@ -1,6 +1,7 @@
 import inquirer from "inquirer";
 import { ConfigManager } from "../core/config-manager.ts";
 import { SERVICE_GROUPS } from "../../q4/const/constants.ts";
+import { Logger } from "../development/logger.ts";
 
 /**
  * Get all available services from all service groups
@@ -16,13 +17,21 @@ export function getAllServices(): string[] {
  */
 export function getLocalServices(): string[] {
   const config = ConfigManager.getInstance();
-  return Object.keys(config.getLocalServices());
+  const localServices = Object.keys(config.getLocalServices());
+  if (localServices.length === 0) {
+    Logger.warn(
+      "No services configured. Run 'quark add' to add services first.",
+    );
+  }
+  return localServices;
 }
 
 /**
  * Create grouped choices for inquirer with optional filtering
  */
-export function createGroupedChoices(filterServices?: (service: string) => boolean) {
+export function createGroupedChoices(
+  filterServices?: (service: string) => boolean,
+) {
   return Object.entries(SERVICE_GROUPS).flatMap(([groupName, group]) => {
     const groupServices = filterServices
       ? group.services.filter(filterServices)
