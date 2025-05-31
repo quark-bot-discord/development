@@ -11,7 +11,9 @@
 
 import { Logger } from "../development/logger.ts";
 import type { K3dCluster } from "../types/types.ts";
-import { ClusterOperations, KubernetesOperations, ServiceDeployment } from "./cluster/index.ts";
+import { ClusterOperations } from "./cluster/cluster-operations.ts";
+import { KubernetesOperations } from "./cluster/kubernetes-operations.ts";
+import { ServiceDeployment } from "./cluster/service-deployment.ts";
 import { ServiceManager } from "./service-manager.ts";
 import { execSync } from "node:child_process";
 

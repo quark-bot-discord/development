@@ -362,7 +362,7 @@ export class ServiceDeployment {
 
         visiting.add(serviceName);
         
-        const dependencies = await this.serviceManager.getServiceDependenciesFromDefinitions(serviceName);
+        const dependencies = await this.serviceManager.getServiceDependencies(serviceName);
         for (const dep of dependencies) {
           if (services.includes(dep)) {
             await visit(dep);
