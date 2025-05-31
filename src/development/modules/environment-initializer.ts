@@ -20,6 +20,7 @@
 import inquirer from "inquirer";
 import { Logger } from "../logger.ts";
 import { ClusterManager } from "../../core/cluster-manager.ts";
+import { ConfigManager } from "../../core/config-manager.ts";
 import { ClusterSelector } from "./cluster-selector.ts";
 import { ProfileManager } from "./profile-manager.ts";
 import { WorkspaceManager } from "./workspace-manager.ts";
@@ -370,8 +371,12 @@ export class EnvironmentInitializer {
   /**
    * Validates the current environment configuration.
    * 
-   * Checks the current state of the development environment and reports
-   * any issues or missing components.
+   * Performs comprehensive validation of the development environment including:
+   * - Configuration file status and validity
+   * - Cluster connectivity and health
+   * - Repository status and dependencies
+   * - VS Code workspace configuration
+   * - Service readiness and dependencies
    * 
    * @returns A promise that resolves to validation results
    * 
@@ -393,23 +398,159 @@ export class EnvironmentInitializer {
     const issues: string[] = [];
     const recommendations: string[] = [];
 
-    // Check for workspace file
+    Logger.info("Validating development environment...");
+
+    // 1. Check configuration file and local services
     try {
-      await Deno.stat("/workspace/quark-dev.code-workspace");
-    } catch {
-      issues.push("VS Code workspace file not found");
-      recommendations.push("Run setup to create workspace configuration");
+      const configManager = ConfigManager.getInstance();
+      await configManager.load();
+      const localServices = configManager.getLocalServices();
+      
+      if (Object.keys(localServices).length === 0) {
+        issues.push("No local services configured");
+        recommendations.push("Run 'quark add' to configure services for local development");
+      } else {
+        Logger.info(`✓ Found ${Object.keys(localServices).length} configured local services`);
+      }
+    } catch (_error) {
+      issues.push("Configuration file could not be loaded");
+      recommendations.push("Run 'quark setup' to initialize configuration");
     }
 
-    // Check for common repositories
-    const commonServices = ['frontend', 'api-gateway'];
-    for (const service of commonServices) {
-      if (await this.workspaceManager.hasRepository(service)) {
-        const isCloned = await this.workspaceManager.isRepositoryCloned(service);
-        if (!isCloned) {
-          issues.push(`Repository for ${service} not cloned`);
+    // 2. Check VS Code workspace file
+    try {
+      await Deno.stat("/workspace/quark-dev.code-workspace");
+      Logger.info("✓ VS Code workspace file exists");
+    } catch {
+      issues.push("VS Code workspace file not found");
+      recommendations.push("Run 'quark workspace' to create workspace configuration");
+    }
+
+    // 3. Check cluster connectivity
+    try {
+      // Check if kubectl can connect to any cluster
+      try {
+        const clusterInfoCmd = new Deno.Command('kubectl', {
+          args: ['cluster-info', '--request-timeout=10s'],
+          stdout: 'piped',
+          stderr: 'piped'
+        });
+        const { success } = await clusterInfoCmd.output();
+        
+        if (!success) {
+          throw new Error('kubectl cluster-info failed');
+        }
+        
+        Logger.info("✓ Kubernetes cluster is accessible");
+        
+        // Check if default namespace exists using direct kubectl command
+        try {
+          const namespaceCmd = new Deno.Command('kubectl', {
+            args: ['get', 'namespace', 'default'],
+            stdout: 'piped',
+            stderr: 'piped'
+          });
+          const { success: namespaceSuccess } = await namespaceCmd.output();
+          
+          if (!namespaceSuccess) {
+            throw new Error('kubectl get namespace default failed');
+          }
+          
+          Logger.info("✓ Default namespace exists");
+        } catch (_namespaceError) {
+          issues.push("Default namespace not found in cluster");
+          recommendations.push("Run 'quark cluster' to setup cluster configuration");
+        }
+      } catch (_connectError) {
+        issues.push("Cannot connect to Kubernetes cluster");
+        recommendations.push("Run 'quark cluster' to setup or connect to a cluster");
+      }
+    } catch (_clusterError) {
+      issues.push("Kubernetes cluster validation failed");
+      recommendations.push("Run 'quark cluster' to setup cluster configuration");
+    }
+
+    // 4. Check repository status for configured services
+    try {
+      const configManager = ConfigManager.getInstance();
+      const localServices = configManager.getLocalServices();
+      let repoIssues = 0;
+      
+      for (const [serviceName, serviceConfig] of Object.entries(localServices)) {
+        try {
+          const repoPath = serviceConfig.repoPath;
+          await Deno.stat(repoPath);
+          
+          // Check if it's a git repository
+          try {
+            await Deno.stat(`${repoPath}/.git`);
+            Logger.info(`✓ Repository for ${serviceName} exists and is a git repo`);
+          } catch {
+            issues.push(`Repository for ${serviceName} exists but is not a git repository`);
+            repoIssues++;
+          }
+        } catch {
+          issues.push(`Repository for ${serviceName} not found at ${serviceConfig.repoPath}`);
+          repoIssues++;
         }
       }
+      
+      if (repoIssues > 0) {
+        recommendations.push("Run 'quark repos' to setup missing repositories");
+      }
+    } catch {
+      issues.push("Could not check repository status");
+      recommendations.push("Verify configuration and repository paths");
+    }
+
+    // 5. Check Git submodules status
+    try {
+      const statusCmd = new Deno.Command('git', {
+        args: ['submodule', 'status'],
+        stdout: 'piped',
+        stderr: 'piped'
+      });
+      const { stdout, success } = await statusCmd.output();
+      
+      if (success) {
+        const status = new TextDecoder().decode(stdout);
+        if (status.trim()) {
+          if (status.includes('-')) {
+            issues.push("Some Git submodules are not initialized");
+            recommendations.push("Run 'quark submodules' to initialize and update submodules");
+          } else if (status.includes('+')) {
+            issues.push("Some Git submodules have uncommitted changes");
+            recommendations.push("Review submodule changes with 'git submodule foreach git status'");
+          } else {
+            Logger.info("✓ Git submodules are properly initialized");
+          }
+        } else {
+          Logger.info("✓ No Git submodules configured");
+        }
+      }
+    } catch {
+      // Git submodules are optional, so don't fail validation
+      Logger.info("? Could not check Git submodule status (this is optional)");
+    }
+
+    // 6. Check Docker daemon (for cluster operations)
+    try {
+      const dockerCmd = new Deno.Command('docker', {
+        args: ['version', '--format', '{{.Server.Version}}'],
+        stdout: 'piped',
+        stderr: 'piped'
+      });
+      const { success } = await dockerCmd.output();
+      
+      if (success) {
+        Logger.info("✓ Docker daemon is running");
+      } else {
+        issues.push("Docker daemon is not accessible");
+        recommendations.push("Start Docker daemon for local cluster operations");
+      }
+    } catch {
+      issues.push("Docker is not available");
+      recommendations.push("Install Docker for local cluster support");
     }
 
     return {

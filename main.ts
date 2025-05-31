@@ -7,7 +7,8 @@ import { SERVICE_GROUPS } from "./q4/const/constants.ts";
 import { Logger } from "./src/development/logger.ts";
 import { getApplicationServices } from "./src/services/service-loader.ts";
 import { ServiceRunner } from "./src/services/service-runner.ts";
-import { EnvironmentInitializer } from "./src/index.ts";
+import { EnvironmentInitializer } from "./src/development/modules/environment-initializer.ts";
+import { ClusterManager } from "./src/core/cluster-manager.ts";
 import {
   getAllServices,
   getLocalServices,
@@ -41,7 +42,16 @@ Commands:
   env    [service]      Display environment variables for a service
   cleanup               Clean up development environment
   list-services         List all available services (used for shell completion)
-  update-submodules     Update all submodules to their latest versions
+  
+  Module Commands:
+  repos                 Setup repositories for configured services
+  cluster               Setup Kubernetes cluster configuration
+  configs               Update service configurations and manifests  
+  workspace             Create/update VS Code workspace configuration
+  submodules            Update all submodules to their latest versions
+  
+  Utility Commands:
+  check                 Validate current environment configuration
   git                   Display Git aliases and usage help
   sign                  Clear GPG key to free it for use in VS Code commits
 `);
@@ -54,6 +64,64 @@ Commands:
     switch (command) {
       case "setup": {
         await new EnvironmentInitializer().setup();
+        break;
+      }
+
+      case "repos": {
+        await config.load();
+        const localServices = getLocalServices();
+        
+        const initializer = new EnvironmentInitializer();
+        await initializer.getWorkspaceManager().setupRepositories(localServices);
+        Logger.success("Repository setup completed!");
+        break;
+      }
+
+      case "cluster": {
+        await config.load();
+        const localServices = getLocalServices();
+
+        const initializer = new EnvironmentInitializer();
+        await initializer.getClusterSelector().setupCluster(localServices);
+        Logger.success("Cluster setup completed!");
+        break;
+      }
+
+      case "configs": {
+        await config.load();
+        const localServices = getLocalServices();
+        
+        const clusterManager = ClusterManager.getInstance();
+        await clusterManager.applyConfigurations(localServices);
+        Logger.success("Service configurations updated!");
+        break;
+      }
+
+      case "workspace": {
+        await config.load();
+        const localServices = getLocalServices();
+           
+        const initializer = new EnvironmentInitializer();
+        await initializer.getWorkspaceManager().createVSCodeWorkspace(localServices);
+        Logger.success("VS Code workspace configuration updated!");
+        break;
+      }
+
+      case "check": {
+        const initializer = new EnvironmentInitializer();
+        const validation = await initializer.validateEnvironment();
+        
+        if (validation.isValid) {
+          Logger.success("Environment validation passed!");
+        } else {
+          Logger.error("Environment validation failed:");
+          validation.issues.forEach(issue => Logger.error(`  • ${issue}`));
+          
+          if (validation.recommendations.length > 0) {
+            Logger.info("\nRecommendations:");
+            validation.recommendations.forEach(rec => Logger.info(`  • ${rec}`));
+          }
+        }
         break;
       }
 
@@ -266,7 +334,7 @@ Commands:
         await new EnvironmentInitializer().cleanup();
         break;
       }
-      case "update-submodules": {
+      case "submodules": {
         const { autoCommit } = await inquirer.prompt([{
           type: "confirm",
           name: "autoCommit",
