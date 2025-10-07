@@ -64,6 +64,10 @@ configure_gpg_signing() {
     
     # Check if GPG keys are available
     if command -v gpg >/dev/null 2>&1; then
+
+        export GPG_TTY=$(tty)
+        echo 'export GPG_TTY=$(tty)' >> ~/.bashrc
+        
         # Get the first available GPG key
         local gpg_key=$(gpg --list-secret-keys --keyid-format=long 2>/dev/null | grep sec | head -1 | sed 's/.*\/\([A-F0-9]*\) .*/\1/')
         

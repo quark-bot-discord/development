@@ -40,8 +40,9 @@ sudo -u vscode bash << 'EOF'
 newgrp docker << 'INNEREOF'
 
 # Add Deno to PATH
-echo 'export PATH="/home/vscode/.deno/bin:$PATH"' >> ~/.bashrc
-echo 'export PATH="/home/vscode/.deno/bin:$PATH"' >> ~/.profile
+echo 'export PATH="$HOME/.deno/bin:$PATH"' >> ~/.bashrc
+echo 'export PATH="$HOME/.deno/bin:$PATH"' >> ~/.profile
+export PATH="$HOME/.deno/bin:$PATH"
 
 # Setup Git configuration
 /workspace/.devcontainer/setup-git.sh
@@ -49,17 +50,18 @@ echo 'export PATH="/home/vscode/.deno/bin:$PATH"' >> ~/.profile
 # Setup command completion
 mkdir -p "$HOME/.local/share/bash-completion/completions"
 cp /workspace/scripts/completion.sh "$HOME/.local/share/bash-completion/completions/quark"
-echo 'source ~/.local/share/bash-completion/completions/quark' >> ~/.bashrc
-echo 'source ~/.local/share/bash-completion/completions/quark' >> ~/.profile
+echo 'source $HOME/.local/share/bash-completion/completions/quark' >> ~/.bashrc
+echo 'source $HOME/.local/share/bash-completion/completions/quark' >> ~/.profile
 
 # Install Quark CLI
 $HOME/.deno/bin/deno install --global -A -f --config /workspace/deno.json --name quark /workspace/main.ts
 
+
 # Setup kubectl completion
-kubectl completion bash > /home/vscode/.local/share/bash-completion/completions/kubectl
+kubectl completion bash > "$HOME/.local/share/bash-completion/completions/kubectl"
 
 # Setup helm completion
-helm completion bash > /home/vscode/.local/share/bash-completion/completions/helm
+helm completion bash > "$HOME/.local/share/bash-completion/completions/helm"
 
 # Verify installations
 echo "Verifying installations..."

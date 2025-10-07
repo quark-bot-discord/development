@@ -1,20 +1,13 @@
 #!/bin/bash
 
-# Get all available services from k8s directories
+# Get all available services from service definitions
 _get_available_services() {
-    local services=""
-    # Search in app-services
-    services+=" $(find /workspace/quark-k8s/app-services -name "*.yaml" -not -name "namespace.yaml" -exec basename {} .yaml \;)"
-    # Search in core-services
-    services+=" $(find /workspace/quark-k8s/core-services -name "*.yaml" -not -name "namespace.yaml" -exec basename {} .yaml \;)"
-    # Search in other-services
-    services+=" $(find /workspace/quark-k8s/other-services -name "*.yaml" -not -name "namespace.yaml" -exec basename {} .yaml \;)"
-    echo "$services"
+    echo $(quark list-services)
 }
 
 # Get configured local services
 _get_local_services() {
-    local config_file="/workspace/.quark-dev-config.json"
+    local config_file="/workspace/quark-dev-config.json"
     if [[ -f "$config_file" ]]; then
         # Add debug output to stderr
         local services=$(jq -r '.localServices | keys[]' "$config_file" 2>/dev/null)
@@ -32,7 +25,7 @@ _quark_completions()
 
     # Handle top-level commands
     if [[ $COMP_CWORD == 1 ]]; then
-        local commands="setup add remove cleanup start list-services update-submodules git"
+        local commands="setup add remove cleanup start env list-services repos cluster configs workspace check submodules git sign"
         COMPREPLY=($(compgen -W "$commands" -- "$cur"))
         return 0
     fi
@@ -63,6 +56,17 @@ _quark_completions()
         remove)
             if [[ $prev == "remove" ]]; then
                 # Fetch and filter local services
+                local services=$(_get_local_services)
+                if [[ -n "$services" ]]; then
+                    COMPREPLY=($(compgen -W "$services" -- "$cur"))
+                else
+                    echo "No local services configured" >&2
+                fi
+            fi
+            ;;
+        env)
+            if [[ $prev == "env" ]]; then
+                # Complete with local service names
                 local services=$(_get_local_services)
                 if [[ -n "$services" ]]; then
                     COMPREPLY=($(compgen -W "$services" -- "$cur"))
