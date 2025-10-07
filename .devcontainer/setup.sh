@@ -16,34 +16,23 @@ mkdir -p /home/vscode/.local/state/vs-kubernetes/tools/helm/linux-amd64
 # Add vscode user to docker group
 usermod -aG docker vscode
 
-# Ensure kubectl is available and create symlink
-if [ -f "/usr/local/bin/kubectl" ]; then
-    ln -sf /usr/local/bin/kubectl /home/vscode/.local/state/vs-kubernetes/tools/kubectl/kubectl
-fi
-
-# Ensure helm is available and create symlink
-if [ -f "/usr/local/bin/helm" ]; then
-    ln -sf /usr/local/bin/helm /home/vscode/.local/state/vs-kubernetes/tools/helm/linux-amd64/helm
-fi
-
-
 # Set initial permissions
-chown -R vscode:vscode /home/vscode/.local
-chown -R vscode:vscode /home/vscode/.cache/deno
-chown -R vscode:vscode /home/vscode/.deno
 chown -R vscode:vscode /workspace/kube
-chown -R vscode:vscode /home/vscode/.local/state/vs-kubernetes
+chown -R vscode:vscode /home/vscode/.cache
+chown -R vscode:vscode /home/vscode/.deno
+chown -R vscode:vscode /home/vscode/.gnupg
 
 # Setup environment for vscode user
 sudo -u vscode bash << 'EOF'
 # Activate docker group in current session
 newgrp docker << 'INNEREOF'
 
+corepack enable && corepack prepare pnpm@latest --activate
+
 # Add Deno to PATH
 echo 'export PATH="$HOME/.deno/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH="$HOME/.deno/bin:$PATH"' >> ~/.profile
 export PATH="$HOME/.deno/bin:$PATH"
-
 # Setup Git configuration
 /workspace/.devcontainer/setup-git.sh
 
@@ -54,11 +43,14 @@ echo 'source $HOME/.local/share/bash-completion/completions/quark' >> ~/.bashrc
 echo 'source $HOME/.local/share/bash-completion/completions/quark' >> ~/.profile
 
 # Install Quark CLI
-$HOME/.deno/bin/deno install --global -A -f --config /workspace/deno.json --name quark /workspace/main.ts
+/usr/local/bin/deno install --global -A -f --config /workspace/deno.json --name quark /workspace/main.ts
 
 
 # Setup kubectl completion
 kubectl completion bash > "$HOME/.local/share/bash-completion/completions/kubectl"
+
+#Setup deno completion
+deno completions bash > "$HOME/.local/share/bash-completion/completions/deno"
 
 # Setup helm completion
 helm completion bash > "$HOME/.local/share/bash-completion/completions/helm"

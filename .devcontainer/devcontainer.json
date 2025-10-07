@@ -1,27 +1,21 @@
 {
   "name": "Quark Development Environment",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
   "mounts": [
     // Docker socket for k3d
-
     // Persistent data volumes
     "source=workspace-data,target=/home/vscode/.local/share,type=volume",
     "source=deno-dir,target=/home/vscode/.cache/deno,type=volume",
     "source=kube-data,target=/workspace/kube,type=volume",
-
     // Main workspace folder for cloned repos
     "source=repos-data,target=/workspace/repos,type=volume",
-
- // Git credentials and SSH keys (bind to host)
+    // Git credentials and SSH keys (bind to host)
     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/.gnupg,target=/home/vscode/.gnupg,type=bind,consistency=cached",
+    // "source=${localEnv:HOME}/.gnupg/pubring.kbx,target=/home/vscode/.gnupg/pubring.kbx,type=bind,consistency=cached",
+    // "source=${localEnv:HOME}/.gnupg/private-keys-v1.d,target=/home/vscode/.gnupg/private-keys-v1.d,type=bind,consistency=cached",
     "source=git-data,target=/home/vscode/.git,type=volume",
-
     // Hidden development files (quark CLI source)
     "source=${localWorkspaceFolder}/.devcontainer,target=/workspace/.devcontainer,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/src,target=/workspace/src,type=bind,consistency=cached",
@@ -31,16 +25,16 @@
   ],
   "remoteEnv": {
     "KUBECONFIG": "/workspace/kube/kubeconfig-quark-dev.yaml",
-    "DOCKER_GROUP_ID": "999" 
+    "DOCKER_GROUP_ID": "999"
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest",
-      "moby": true
+      "moby": false
     },
+    "ghcr.io/prulloac/devcontainer-features/deno:1": {},
+    "ghcr.io/rio/features/k3d:1": {},
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
-      "version": "1.28",
-      "helm": "3.18.0",
       "minikube": "none"
     },
     "ghcr.io/devcontainers/features/common-utils:2": {
@@ -50,8 +44,7 @@
       "upgradePackages": true
     },
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "22",
-      "nodeGypDependencies": true
+      "version": "lts"
     },
     "ghcr.io/devcontainers/features/git:1": {
       "ppa": true,
@@ -86,7 +79,8 @@
       }
     }
   },
-  "updateRemoteUserUID": true,
-  "postStartCommand": "sudo /workspace/.devcontainer/setup.sh && exec bash",
-  "postCreateCommand": "corepack enable && corepack prepare pnpm@latest --activate"
+  "privileged": true,
+  "containerUser": "vscode",
+  "postCreateCommand": "sudo /workspace/.devcontainer/setup.sh",
+  "postAttachCommand": "sudo /workspace/.devcontainer/setup.sh"
 }
