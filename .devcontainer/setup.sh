@@ -18,9 +18,8 @@ usermod -aG docker vscode
 
 # Set initial permissions
 chown -R vscode:vscode /workspace
-chown -R vscode:vscode /home/vscode/.cache
-chown -R vscode:vscode /home/vscode/.deno
-chown -R vscode:vscode /home/vscode/.gnupg
+chown -R vscode:vscode /home/vscode
+
 
 # Setup environment for vscode user
 sudo -u vscode bash << 'EOF'
