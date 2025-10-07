@@ -3,5 +3,8 @@
   "deno.lint": true,
   "deno.unstable": true,
   "deno.test.enable": true,
-  "deno.test.autoRun": true
+  "deno.test.autoRun": true,
+  "git.autoRepositoryDetection": "subFolders",
+  "git.scanRepositories": ["repos"],
+  "git.repositoryScanMaxDepth": 3
 }
