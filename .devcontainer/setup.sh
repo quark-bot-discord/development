@@ -17,7 +17,7 @@ mkdir -p /home/vscode/.local/state/vs-kubernetes/tools/helm/linux-amd64
 usermod -aG docker vscode
 
 # Set initial permissions
-chown -R vscode:vscode /workspace/kube
+chown -R vscode:vscode /workspace
 chown -R vscode:vscode /home/vscode/.cache
 chown -R vscode:vscode /home/vscode/.deno
 chown -R vscode:vscode /home/vscode/.gnupg
